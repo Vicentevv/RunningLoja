@@ -5,7 +5,7 @@ Este documento describe la planificación de la metodología Scrum para el desar
 
 1. Product Backlog (Lista de Requisitos)
 
-Requisitos Funcionales (Pantallas y Características)
+1.1. Requisitos Funcionales (Pantallas y Características)
 
 Pantalla de carga (Splash screen).
 
@@ -275,7 +275,7 @@ El consumo de batería durante el registro de una ruta no debe superar el 10% po
 
 RNF05
 
-Las pantallas deben responder en menos de 2 segundos al interactuar (toques, scroll, botones, etc.).
+Las pantallas deben responder en menos de 2 segundos al interactuar.
 
 Seguridad y privacidad
 
@@ -287,7 +287,7 @@ Las contraseñas de los usuarios deben almacenarse cifradas (por ejemplo, con bc
 
 RNF07
 
-Los datos personales (peso, edad, altura, etc.) deben estar protegidos bajo políticas de privacidad y acceso restringido.
+Los datos personales deben estar protegidos bajo políticas de privacidad y acceso restringido.
 
 
 
@@ -299,7 +299,7 @@ Usabilidad y diseño
 
 RNF11
 
-La interfaz debe ser intuitiva y accesible para todo tipo de usuario, con íconos claros y textos legibles.
+La interfaz debe ser intuitiva y accesible para todo tipo de usuario.
 
 
 
@@ -317,13 +317,13 @@ La app debe permitir su uso tanto en modo claro como en modo oscuro.
 
 RNF15
 
-El reproductor de música debe permitir control sin necesidad de salir de la pantalla de entrenamiento.
+El reproductor de música debe permitir control sin salir de la pantalla de entrenamiento.
 
 Conectividad y disponibilidad
 
 RNF16
 
-La aplicación debe funcionar correctamente en modo offline, permitiendo registrar rutas y sincronizarlas cuando haya conexión.
+La aplicación debe funcionar correctamente en modo offline y sincronizar al haber conexión.
 
 
 
@@ -371,7 +371,7 @@ La aplicación debe ser compatible con Android 8.0+.
 
 RNF25
 
-Debe adaptarse correctamente a diferentes resoluciones de pantalla (smartphones y tablets).
+Debe adaptarse correctamente a diferentes resoluciones de pantalla.
 
 Notificaciones y comunicación
 
@@ -551,10 +551,10 @@ Revisión de todas las HUs y RNFs.
 
 Documentación técnica, manual de usuario y app lista para publicación.
 
-Observaciones Finales
+5. Observaciones Finales
 
-Desarrollo (Daily Scrum): No detallado, se asume reunión diaria para seguimiento.
+Desarrollo (Daily Scrum): Se asume una reunión diaria de seguimiento del progreso.
 
-Sprint Review: Se realiza al finalizar cada Sprint.
+Sprint Review: Se realizará al finalizar cada Sprint para inspeccionar el incremento del producto.
 
-Sprint Retrospective: Se realiza al finalizar cada Sprint.
+Sprint Retrospective: Se realizará al finalizar cada Sprint para inspeccionar el proceso y planificar mejoras.
