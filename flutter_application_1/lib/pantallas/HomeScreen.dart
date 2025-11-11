@@ -1,0 +1,590 @@
+import 'package:flutter/material.dart';
+
+// --- Definición de Colores (Ajusta estos colores a tu tema) ---
+const Color kPrimaryGreen = Color(0xFF3A7D6E); // Un verde oscuro para el header
+const Color kLightGreenBackground = Color(0xFFF0F5F3);
+const Color kCardBackgroundColor = Colors.white;
+const Color kPrimaryTextColor = Color(0xFF333333);
+const Color kSecondaryTextColor = Color(0xFF666666);
+const Color kAccentOrange = Color(0xFFE67E22);
+const Color kAccentBlue = Color(0xFF3498DB);
+const Color kAccentDarkGreen = Color(0xFF2E7D32);
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0; // Índice para el BottomNavBar
+  bool _showNotifications = false; // Estado para mostrar el panel
+
+  void _onNavBarTap(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    if (index == 0) {
+      // Ya estamos en Home, no hacemos nada
+    }
+    if (index == 1) {
+      Navigator.pushNamed(context, '/EventosScreen');
+    }
+    if (index == 2) {
+      Navigator.pushNamed(context, '/ProfileScreen');
+    }
+    if (index == 3) {
+      Navigator.pushNamed(context, '/CommunityScreen');
+    }
+    if (index == 4) {
+      Navigator.pushNamed(context, '/TrainingScreen');
+    }
+  }
+
+  void _toggleNotifications() {
+    setState(() {
+      _showNotifications = !_showNotifications;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kLightGreenBackground,
+      // Usamos un Stack para poder superponer el panel de notificaciones
+      body: Stack(
+        children: [
+          // Contenido principal de la pantalla
+          GestureDetector(
+            onTap: () {
+              // Oculta el panel si se toca fuera de él
+              if (_showNotifications) {
+                _toggleNotifications();
+              }
+            },
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  _buildQuickAccess(),
+                  _buildUpcomingEvents(),
+                  const SizedBox(height: 24), // Espacio al final
+                ],
+              ),
+            ),
+          ),
+
+          // Panel de Notificaciones (se muestra condicionalmente)
+          if (_showNotifications) _buildNotificationPanel(),
+        ],
+      ),
+      bottomNavigationBar: _buildBottomNavBar(),
+    );
+  }
+
+  /// Construye el Header verde de bienvenida y estadísticas
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+      decoration: const BoxDecoration(
+        color: kPrimaryGreen,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Fila de Saludo y Notificaciones
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '¡Hola!',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    'Carlos Mendoza',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              // Stack para el ícono de campana con la insignia
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 30),
+                    onPressed: _toggleNotifications,
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: const Text(
+                        '2',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            '¡Listo para tu próxima carrera! 🏃',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Fila de Tarjetas de Estadísticas
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildStatCard(Icons.schedule, 'Esta semana', '12,5', 'kilómetros'),
+              _buildStatCard(Icons.local_fire_department, 'Calorías', '850', null),
+              _buildStatCard(Icons.emoji_events, 'Eventos', '3', null),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tarjeta individual para las estadísticas en el header
+  Widget _buildStatCard(IconData icon, String title, String value, String? unit) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: Colors.white, size: 28),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            const SizedBox(height: 4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (unit != null) const SizedBox(width: 4),
+                if (unit != null)
+                  Text(
+                    unit,
+                    style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Sección de "Acceso rápido"
+  Widget _buildQuickAccess() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Acceso rápido',
+            style: TextStyle(
+              color: kPrimaryTextColor,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          GridView.count(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            shrinkWrap: true, // Para que funcione dentro de SingleChildScrollView
+            physics: const NeverScrollableScrollPhysics(), // Desactiva scroll de GridView
+            children: [
+              _buildAccessCard(Icons.event, 'Eventos', 'Próximas carreras', kAccentDarkGreen),
+              _buildAccessCard(Icons.people, 'Comunidad', 'Conecta con corredores', kAccentBlue),
+              _buildAccessCard(Icons.fitness_center, 'Entrenar', 'Planes de entrenamiento', kAccentOrange),
+              _buildAccessCard(Icons.map_outlined, 'Rutas', 'Explora Loja', kPrimaryGreen),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tarjeta individual para el "Acceso rápido"
+  Widget _buildAccessCard(IconData icon, String title, String subtitle, Color iconColor) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kCardBackgroundColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: iconColor, size: 32),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: TextStyle(
+              color: kPrimaryTextColor,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(color: kSecondaryTextColor, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Sección de "Próximos eventos"
+  Widget _buildUpcomingEvents() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Próximos eventos',
+                style: TextStyle(
+                  color: kPrimaryTextColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              TextButton(
+                onPressed: () {},
+                child: const Text(
+                  'Ver todos',
+                  style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildEventCard(
+            'assets/runner.png', // Reemplaza con tu asset
+            'Maratón Ciudad de Loja',
+            '15 de febrero • 6:00 AM',
+            'Centro de Loja',
+            '245 inscrit...',
+          ),
+          const SizedBox(height: 16),
+          _buildEventCard(
+            'assets/hiker.png', // Reemplaza con tu asset
+            'Podocarpo para correr por senderos',
+            '22 de febrero • 7:00 AM',
+            'Parque Podocarpo...',
+            '89 inscrit...',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tarjeta individual para un "Evento"
+  Widget _buildEventCard(String imagePath, String title, String dateTime, String location, String participants) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kCardBackgroundColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Imagen del evento
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.grey[200],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.cover,
+                // Fallback por si la imagen no carga
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(Icons.sports, color: kPrimaryGreen, size: 40);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Detalles del evento
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: kPrimaryTextColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_outlined, color: kSecondaryTextColor, size: 14),
+                    const SizedBox(width: 6),
+                    Text(dateTime, style: TextStyle(color: kSecondaryTextColor, fontSize: 14)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Fila de Ubicación y Participantes
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.location_on_outlined, color: kSecondaryTextColor, size: 14),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              location,
+                              style: TextStyle(color: kSecondaryTextColor, fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.person_outline, color: kSecondaryTextColor, size: 14),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              participants,
+                              style: TextStyle(color: kSecondaryTextColor, fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Panel de Notificaciones que se superpone
+  Widget _buildNotificationPanel() {
+    // Obtenemos la altura del padding superior (área de la barra de estado)
+    final double statusBarHeight = MediaQuery.of(context).padding.top;
+    return Positioned(
+      top: statusBarHeight + 10, // Se posiciona debajo de la barra de estado
+      right: 16,
+      child: Material(
+        elevation: 10,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.85, // 85% del ancho
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Notificaciones',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: kPrimaryTextColor,
+                  ),
+                ),
+              ),
+              _buildNotificationItem(Icons.event_available, kAccentDarkGreen, 'Nuevo evento disponible', 'Maratón Ciudad de Loja - Inscripciones abiertas', '2 minutos', true),
+              _buildNotificationItem(Icons.person_add, kAccentBlue, 'Nuevo seguidor', 'Maria González comenzó a seguirte', '15 minutos', false),
+              _buildNotificationItem(Icons.emoji_events, kAccentOrange, '¡Logro desbloqueado!', 'Has puesto 50 km este mes', '1 hora', false),
+              _buildNotificationItem(Icons.alarm, Colors.redAccent, 'Recordatorio de entrenamiento', 'Es hora de tu carrera matutina', '2 horas', false),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Item individual para la lista de notificaciones
+  Widget _buildNotificationItem(IconData icon, Color iconColor, String title, String subtitle, String time, bool hasDot) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: iconColor.withOpacity(0.15),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: iconColor),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+      subtitle: Row(
+        children: [
+          if (hasDot)
+            Container(
+              width: 6,
+              height: 6,
+              margin: const EdgeInsets.only(right: 6),
+              decoration: const BoxDecoration(color: kAccentBlue, shape: BoxShape.circle),
+            ),
+          Expanded(
+            child: Text(
+              subtitle,
+              style: const TextStyle(fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      trailing: Text(time, style: const TextStyle(color: kSecondaryTextColor, fontSize: 10)),
+      onTap: () {
+        // Lógica al tocar una notificación
+        _toggleNotifications(); // Cierra el panel
+      },
+    );
+  }
+
+  /// Barra de Navegación Inferior
+  Widget _buildBottomNavBar() {
+    return BottomNavigationBar(
+      currentIndex: _selectedIndex,
+      onTap: _onNavBarTap,
+      type: BottomNavigationBarType.fixed, // Muestra todos los labels
+      backgroundColor: kCardBackgroundColor,
+      selectedItemColor: kPrimaryGreen,
+      unselectedItemColor: kSecondaryTextColor,
+      showSelectedLabels: true,
+      showUnselectedLabels: true,
+      selectedFontSize: 12,
+      unselectedFontSize: 12,
+      items: [
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.home_outlined),
+          activeIcon: Icon(Icons.home),
+          label: 'Inicio',
+        ),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.calendar_today_outlined),
+          activeIcon: Icon(Icons.calendar_today),
+          label: 'Eventos',
+        ),
+        // Ítem de Perfil (Central y estilizado)
+        BottomNavigationBarItem(
+          icon: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              // El círculo verde solo aparece cuando está activo
+              color: _selectedIndex == 2 ? kPrimaryGreen.withOpacity(0.1) : Colors.transparent,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.person_outline,
+              color: _selectedIndex == 2 ? kPrimaryGreen : kSecondaryTextColor,
+            ),
+          ),
+          label: 'Perfil',
+        ),
+        const BottomNavigationBarItem( 
+          icon: Icon(Icons.people_outline),
+          activeIcon: Icon(Icons.people),
+          label: 'Comunidad',
+        ),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.play_arrow),
+          activeIcon: Icon(Icons.play_arrow_outlined),
+          label: 'Entrenar',
+        ),
+      ],
+    );
+  }
+}
