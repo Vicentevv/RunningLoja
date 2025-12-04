@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../servicios/AuthService.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'EventDetailScreen.dart';
+import 'EventosScreen.dart' show EventInfo;
 
 // --- Definición de Colores ---
 const Color kPrimaryGreen = Color(0xFF3A7D6E);
@@ -30,10 +33,44 @@ class _HomeScreenState extends State<HomeScreen> {
   int _calorias = 0;
   int _eventos = 0;
 
+  /// EVENTOS PARA LA SECCIÓN
+  List<EventInfo> _proximosEventos = [];
+  bool _loadingEventos = true;
+
   @override
   void initState() {
     super.initState();
     _loadUserName(); // <--- CARGAR NOMBRE AL INICIAR
+    _loadUpcomingEvents(); // <--- CARGAR PRÓXIMOS EVENTOS
+  }
+
+  /// ----------------------------------------------------------
+  /// FUNCIÓN PARA CARGAR LOS 3 PRÓXIMOS EVENTOS
+  /// ----------------------------------------------------------
+  Future<void> _loadUpcomingEvents() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('eventos')
+          .orderBy('fecha')
+          .limit(3)
+          .get();
+
+      final eventos = snapshot.docs
+          .map((doc) => EventInfo.fromFirestore(doc))
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _proximosEventos = eventos;
+        _loadingEventos = false;
+      });
+    } catch (e) {
+      print("ERROR cargando eventos: $e");
+      if (!mounted) return;
+      setState(() {
+        _loadingEventos = false;
+      });
+    }
   }
 
   /// ----------------------------------------------------------
@@ -47,18 +84,22 @@ class _HomeScreenState extends State<HomeScreen> {
       if (snapshot != null && snapshot.data() != null) {
         final data = snapshot.data() as Map<String, dynamic>;
 
+        if (!mounted) return;
         setState(() {
           _fullName = data["fullName"] ?? "Usuario";
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _fullName = "Usuario";
         });
       }
     } catch (e) {
-      setState(() {
-        _fullName = "Usuario";
-      });
+      if (mounted) {
+        setState(() {
+          _fullName = "Usuario";
+        });
+      }
       print("ERROR cargando nombre: $e");
     }
   }
@@ -418,143 +459,152 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
+          if (_loadingEventos)
+            const Center(
+              child: CircularProgressIndicator(),
+            )
+          else if (_proximosEventos.isEmpty)
+            const Center(
+              child: Text('No hay eventos disponibles'),
+            )
+          else
+            Column(
+              children: _proximosEventos
+                  .map((evento) => _buildEventCard(evento))
+                  .toList(),
+            ),
         ],
       ),
     );
   }
 
-  /// Tarjeta individual para un "Evento"
+  /// Tarjeta individual para un "Evento" - IDÉNTICA A EventosScreen
   Widget _buildEventCard(
-    String imagePath,
-    String title,
-    String dateTime,
-    String location,
-    String participants,
+    EventInfo evento,
   ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: kCardBackgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EventDetailScreen(event: evento),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Imagen del evento
-          Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: Colors.grey[200],
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: kCardBackgroundColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                imagePath,
-                fit: BoxFit.cover,
-                // Fallback por si la imagen no carga
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(
-                    Icons.sports,
-                    color: kPrimaryGreen,
-                    size: 40,
-                  );
-                },
+          ],
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: evento.imagenBase64.isNotEmpty
+                  ? (() {
+                      try {
+                        final bytes = base64Decode(evento.imagenBase64);
+                        return Image.memory(
+                          bytes,
+                          width: 80,
+                          height: 110,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey[300],
+                            width: 80,
+                            height: 110,
+                            child: const Icon(Icons.image_not_supported, size: 40),
+                          ),
+                        );
+                      } catch (e) {
+                        // Si falla la decodificación, mostramos placeholder seguro
+                        return Container(
+                          width: 80,
+                          height: 110,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.broken_image, size: 40),
+                        );
+                      }
+                    })()
+                  : evento.imageUrl.startsWith('assets/')
+                      ? Image.asset(
+                          evento.imageUrl,
+                          width: 80,
+                          height: 110,
+                          fit: BoxFit.cover,
+                        )
+                      : Image.network(
+                          evento.imageUrl,
+                          width: 80,
+                          height: 110,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.image_not_supported,
+                                size: 40),
+                          ),
+                        ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    evento.categoria,
+                    style: const TextStyle(
+                      color: kPrimaryGreen,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    evento.nombre,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: kPrimaryTextColor,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  _iconText(Icons.calendar_month, evento.fecha),
+                  _iconText(Icons.location_on_outlined, evento.ubicacion),
+                  _iconText(Icons.people, '${evento.inscritos} inscritos'),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: 16),
-          // Detalles del evento
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Helper para mostrar icon + text
+  Widget _iconText(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(icon, color: kSecondaryTextColor, size: 14),
+          const SizedBox(width: 6),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: kPrimaryTextColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_today_outlined,
-                      color: kSecondaryTextColor,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      dateTime,
-                      style: TextStyle(
-                        color: kSecondaryTextColor,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Fila de Ubicación y Participantes
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            color: kSecondaryTextColor,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              location,
-                              style: TextStyle(
-                                color: kSecondaryTextColor,
-                                fontSize: 14,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.person_outline,
-                            color: kSecondaryTextColor,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              participants,
-                              style: TextStyle(
-                                color: kSecondaryTextColor,
-                                fontSize: 14,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12, color: kSecondaryTextColor),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

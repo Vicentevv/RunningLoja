@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/servicios/AuthService.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // para leer/guardar perfil
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 
 // --- Definición de Colores ---
 const Color kPrimaryGreen = Color(0xFF3A7D6E);
@@ -78,33 +81,132 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Índice actual para la barra de navegación inferior
-  int _selectedIndex = 2; // 2 corresponde a "Perfil"
+  int _selectedIndex = 2; 
 
-  // --- DATOS DEL PERFIL (AHORA SON VARIABLES DE ESTADO) ---
-  String _nombre = "Carlos Mendoza";
-  String _email = "carlos.mendoza@email.com";
-  String _descripcion = "Abierto (20-35 años) • Intermedio";
-  String _avatarUrl =
-      'https://th.bing.com/th/id/R.396fe9612612f1114139cfd84fffc2ab?rik=ZftYAC4zPrwlhg&pid=ImgRaw&r=0';
-  String _alturaCm = "175";
-  String _pesoKg = "70";
-  String _objetivo = "Completar mi primer maratón en 2024";
-  // ---
+  // --- VARIABLES DE DATOS DEL PERFIL ---
+  String _nombre = '';
+  String _email = '';
+  String _descripcion = '';
+  String _avatarUrl = '';
+  String _alturaCm = '--'; // Valor por defecto visual
+  String _pesoKg = '--';   // Valor por defecto visual
+  String _objetivo = '';
 
-  /// NAVEGA A LA PANTALLA DE EDICIÓN Y ESPERA LOS RESULTADOS
+  // --- VARIABLES DE ESTADÍSTICAS (NUEVAS) ---
+  String _distanciaTotal = "0";
+  String _totalCarreras = "0";
+  String _ritmoPromedio = "0:00";
+  String _totalEventos = "0";
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile(); // cargar datos desde Firebase al iniciar
+    // Suscripción en tiempo real para actualizar perfil cuando cambie en Firestore
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      _profileSub = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .snapshots()
+          .listen((snap) {
+        if (!mounted) return;
+        if (snap.exists && snap.data() != null) {
+          final data = snap.data() as Map<String, dynamic>;
+          setState(() {
+            _distanciaTotal = (data['totalDistance'] ?? data['total_distance'] ?? _distanciaTotal).toString();
+            _totalCarreras = (data['totalRuns'] ?? data['session_count'] ?? data['sessionCount'] ?? _totalCarreras).toString();
+            _ritmoPromedio = (data['averagePace'] ?? _ritmoPromedio).toString();
+            if (data['myEventIds'] != null && data['myEventIds'] is List) {
+              _totalEventos = (data['myEventIds'] as List).length.toString();
+            }
+          });
+        }
+      }, onError: (e) {
+        // no bloquear la app por errores de suscripción
+        print('Profile listener error: $e');
+      });
+    }
+  }
+
+  /// Carga los datos del perfil y estadísticas desde Firestore
+  Future<void> _loadUserProfile() async {
+    try {
+      final auth = AuthService();
+      final snapshot = await auth.getUserData();
+
+      if (snapshot != null && snapshot.exists && snapshot.data() != null) {
+        final data = snapshot.data() as Map<String, dynamic>;
+
+        if (!mounted) return;
+        setState(() {
+          // --- DATOS PERSONALES ---
+          _nombre = data["fullName"] ?? _nombre;
+          _email = data["email"] ?? _email;
+          _descripcion = data["role"] ?? _descripcion; // Usamos 'role' como descripción o el campo que prefieras
+          
+          // Conversión segura de números a String para altura y peso
+          _alturaCm = (data["height"] != null && data["height"] != 0) 
+              ? data["height"].toString() 
+              : "--";
+          
+          _pesoKg = (data["weight"] != null && data["weight"] != 0) 
+              ? data["weight"].toString() 
+              : "--";
+              
+          _objetivo = data["currentGoal"] ?? "Sin objetivo definido";
+
+          if (data["photoUrl"] != null && data["photoUrl"].toString().isNotEmpty) {
+            _avatarUrl = data["photoUrl"];
+          }
+
+          // --- ESTADÍSTICAS (NUEVO) ---
+          
+          // 1. Distancia Total (totalDistance)
+          if (data["totalDistance"] != null) {
+            // Convertimos a String, si quieres formatear decimales puedes usar .toStringAsFixed(1)
+            _distanciaTotal = data["totalDistance"].toString();
+          }
+
+          // 2. Carreras Totales (totalRuns)
+          if (data["totalRuns"] != null) {
+            _totalCarreras = data["totalRuns"].toString();
+          }
+
+          // 3. Ritmo Promedio (averagePace)
+          _ritmoPromedio = data["averagePace"] ?? "0:00";
+
+          // 4. Eventos (myEventIds es un array, contamos su longitud)
+          if (data["myEventIds"] != null && data["myEventIds"] is List) {
+            _totalEventos = (data["myEventIds"] as List).length.toString();
+          }
+        });
+      }
+    } catch (e) {
+      print("Error cargando perfil: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    _profileSub?.cancel();
+    super.dispose();
+  }
+
+  /// NAVEGA A LA PANTALLA DE EDICIÓN
   void _navigateToEditProfile() async {
+    // Mapa con datos actuales para enviar al formulario
     final Map<String, String> currentUserData = {
       'nombre': _nombre,
       'email': _email,
       'descripcion': _descripcion,
-      'altura': _alturaCm,
-      'peso': _pesoKg,
+      'altura': _alturaCm == "--" ? "" : _alturaCm, // Enviamos vacío si es -- para que no estorbe al editar
+      'peso': _pesoKg == "--" ? "" : _pesoKg,
       'objetivo': _objetivo,
       'avatarUrl': _avatarUrl,
     };
 
-    // Navega a la pantalla de edición y espera a que regrese (con Navigator.pop)
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -113,17 +215,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
 
-    // Si 'result' no es nulo, significa que el usuario guardó los cambios.
     if (result != null && result is Map<String, String>) {
+      if (!mounted) return;
+      // Actualizamos UI localmente
       setState(() {
         _nombre = result['nombre'] ?? _nombre;
-        _email = result['email'] ?? _email;
+        // _email = result['email'] ?? _email; // Generalmente el email no se cambia aquí
         _descripcion = result['descripcion'] ?? _descripcion;
-        _alturaCm = result['altura'] ?? _alturaCm;
-        _pesoKg = result['peso'] ?? _pesoKg;
+        _alturaCm = result['altura']?.isEmpty ?? true ? "--" : result['altura']!;
+        _pesoKg = result['peso']?.isEmpty ?? true ? "--" : result['peso']!;
         _objetivo = result['objetivo'] ?? _objetivo;
-        // _avatarUrl = result['avatarUrl'] ?? _avatarUrl; // (La URL no se edita en este form)
       });
+
+      // Guardamos en Firebase
+      _saveProfileToFirebase(result);
+    }
+  }
+
+  /// Guarda los cambios en Firestore (Solo datos editables)
+  Future<void> _saveProfileToFirebase(Map<String, String> newData) async {
+    try {
+      final auth = AuthService();
+      final String? uid = auth.getCurrentUserId(); // Asegúrate de tener este método en AuthService o usa auth.currentUser?.uid
+      
+      // Si no tienes getCurrentUserId, puedes usar:
+      // final uid = FirebaseAuth.instance.currentUser?.uid; 
+      
+      if (uid == null) return;
+
+      // Convertimos Strings numéricos a int/double para la BD
+      int? newHeight = int.tryParse(newData['altura'] ?? "");
+      int? newWeight = int.tryParse(newData['peso'] ?? "");
+
+      final Map<String, dynamic> updateMap = <String, dynamic>{};
+      
+      updateMap['fullName'] = newData['nombre'];
+      updateMap['role'] = newData['descripcion']; // Mapeamos 'descripcion' a 'role' según tu BD
+      updateMap['height'] = newHeight ?? 0;
+      updateMap['weight'] = newWeight ?? 0;
+      updateMap['currentGoal'] = newData['objetivo']; // Mapeamos a 'currentGoal'
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).update(updateMap);
+      
+    } catch (e) {
+      print("Error guardando perfil: $e");
     }
   }
 
@@ -285,8 +420,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               CircleAvatar(
                 radius: 35,
-                backgroundImage: NetworkImage(_avatarUrl), // Usa la variable
-                backgroundColor: Colors.white.withOpacity(0.3),
+                backgroundColor: _avatarUrl.isNotEmpty
+                    ? Colors.white.withOpacity(0.3)
+                    : kPrimaryGreen.withOpacity(0.8),
+                backgroundImage:
+                    _avatarUrl.isNotEmpty ? NetworkImage(_avatarUrl) : null,
+                child: _avatarUrl.isEmpty
+                    ? const Icon(Icons.person, size: 40, color: Colors.white)
+                    : null,
               ),
               const SizedBox(width: 15),
               Expanded(
@@ -295,24 +436,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _nombre, // Usa la variable
+                      _nombre.isNotEmpty ? _nombre : 'Usuario',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      _email, // Usa la variable
-                      style: TextStyle(color: Colors.white.withOpacity(0.9)),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    if (_email.isNotEmpty)
+                      Text(
+                        _email,
+                        style: TextStyle(color: Colors.white.withOpacity(0.9)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     const SizedBox(height: 4),
-                    Text(
-                      _descripcion, // Usa la variable
-                      style: TextStyle(color: Colors.white.withOpacity(0.9)),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    if (_descripcion.isNotEmpty)
+                      Text(
+                        _descripcion,
+                        style: TextStyle(color: Colors.white.withOpacity(0.9)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                   ],
                 ),
               ),
@@ -348,19 +491,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
       childAspectRatio: 1.8,
       children: [
         _buildStatItem(
-          "156,8",
+          _distanciaTotal, // Variable conectada a DB
           "kilómetros",
           "Distancia total",
           Colors.blue[700]!,
         ),
         _buildStatItem(
-          "24",
+          _totalCarreras, // Variable conectada a DB
           "Carreras",
           "Carreras completadas",
           Colors.green[600]!,
         ),
-        _buildStatItem("5:45", "min/km", "Ritmo", Colors.orange[700]!),
-        _buildStatItem("3", "Eventos", "Eventos", Colors.purple[600]!),
+        _buildStatItem(
+          _ritmoPromedio, // Variable conectada a DB
+          "min/km",
+          "Ritmo",
+          Colors.orange[700]!,
+        ),
+        _buildStatItem(
+          _totalEventos, // Variable conectada a DB
+          "Eventos",
+          "Eventos inscritos",
+          Colors.purple[600]!,
+        ),
       ],
     );
   }
@@ -739,11 +892,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               Center(
                 child: CircleAvatar(
                   radius: 50,
-                  backgroundImage: NetworkImage(
-                    widget.currentUserData['avatarUrl']!,
-                  ),
+                  backgroundColor: kPrimaryGreen.withOpacity(0.8),
+                  backgroundImage: (widget.currentUserData['avatarUrl']?.isNotEmpty ?? false)
+                      ? NetworkImage(widget.currentUserData['avatarUrl']!)
+                      : null,
                   child: Stack(
                     children: [
+                      if ((widget.currentUserData['avatarUrl']?.isEmpty ?? true))
+                        const Icon(Icons.person, size: 60, color: Colors.white),
                       Positioned(
                         bottom: 0,
                         right: 0,
@@ -776,11 +932,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 label: 'Correo electrónico',
                 icon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
+                readOnly: true,
               ),
               const SizedBox(height: 16),
               _buildTextFormField(
                 controller: _descripcionController,
-                label: 'Descripción (Categoría, Nivel)',
+                label: 'Descripción (Role)',
                 icon: Icons.info_outline,
               ),
               const SizedBox(height: 24),
@@ -843,24 +1000,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     String? suffixText,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    bool readOnly = false,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      readOnly: readOnly,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: kSecondaryTextColor),
-        prefixIcon: Icon(icon),
+        prefixIcon: Icon(icon, color: kPrimaryGreen),
         suffixText: suffixText,
         suffixStyle: const TextStyle(color: kSecondaryTextColor),
+        filled: true,
+        fillColor: readOnly ? Colors.grey[200] : Colors.white,
       ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Este campo no puede estar vacío';
-        }
-        return null;
-      },
+      validator: (value) => (value == null || value.isEmpty) ? 'Este campo no puede estar vacío' : null,
     );
   }
 }

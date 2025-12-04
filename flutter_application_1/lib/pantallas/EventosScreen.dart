@@ -295,18 +295,30 @@ class _EventosScreenState extends State<EventosScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: event.imagenBase64.isNotEmpty
-                  ? Image.memory(
-                      base64Decode(event.imagenBase64),
-                      width: 80,
-                      height: 110,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: Colors.grey[300],
-                        width: 80,
-                        height: 110,
-                        child: const Icon(Icons.image_not_supported, size: 40),
-                      ),
-                    )
+                  ? (() {
+                      try {
+                        final bytes = base64Decode(event.imagenBase64);
+                        return Image.memory(
+                          bytes,
+                          width: 80,
+                          height: 110,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey[300],
+                            width: 80,
+                            height: 110,
+                            child: const Icon(Icons.image_not_supported, size: 40),
+                          ),
+                        );
+                      } catch (e) {
+                        return Container(
+                          width: 80,
+                          height: 110,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.broken_image, size: 40),
+                        );
+                      }
+                    })()
                   : event.imageUrl.startsWith('assets/')
                   ? Image.asset(
                       event.imageUrl,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/pantallas/EventosScreen.dart';
+import 'dart:convert';
 
 class EventDetailScreen extends StatelessWidget {
   final EventInfo event;
@@ -151,20 +152,55 @@ class EventDetailScreen extends StatelessWidget {
         SizedBox(
           height: 300,
           width: double.infinity,
-          child: event.imageUrl.startsWith('assets/')
-              ? Image.asset(event.imageUrl, fit: BoxFit.cover)
-              : Image.network(
-                  event.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.grey[300],
-                    child: const Icon(
-                      Icons.image_not_supported,
-                      size: 60,
-                      color: Colors.grey,
+          child: event.imagenBase64.isNotEmpty
+              ? (() {
+                  try {
+                    final bytes = base64Decode(event.imagenBase64);
+                    return Image.memory(
+                      bytes,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: 300,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          size: 60,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    return event.imageUrl.startsWith('assets/')
+                        ? Image.asset(event.imageUrl, fit: BoxFit.cover)
+                        : Image.network(
+                            event.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: Colors.grey[300],
+                              child: const Icon(
+                                Icons.image_not_supported,
+                                size: 60,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          );
+                  }
+                })()
+              : event.imageUrl.startsWith('assets/')
+                  ? Image.asset(event.imageUrl, fit: BoxFit.cover)
+                  : Image.network(
+                      event.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          size: 60,
+                          color: Colors.grey,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
         ),
         Container(
           height: 300,

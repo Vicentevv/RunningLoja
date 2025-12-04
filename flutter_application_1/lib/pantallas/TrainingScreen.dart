@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:location/location.dart';
+import 'dart:async';
+import 'dart:math' show sqrt, cos, sin, atan2, pi, Random;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // --- Definición de Colores ---
 const Color kPrimaryGreen = Color(0xFF3A7D6E);
@@ -39,6 +43,17 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
   Location _location = Location();
   LatLng _currentPosition = const LatLng(3.9936, -79.2045); // Posición inicial (Loja)
   bool _isLoadingLocation = true;
+  bool _simulateMode = false; // Si true, usar simulación en lugar de GPS
+  // StreamSubscription para rastrear cambios de ubicación (para cancelar después)
+  dynamic _locationSubscription;
+
+  // --- Estadísticas de Entrenamiento en Tiempo Real ---
+  int _elapsedSeconds = 0; // Tiempo transcurrido en segundos
+  double _totalDistance = 0.0; // Distancia total en km
+  double _pace = 0.0; // Ritmo en min/km
+  LatLng? _lastPosition; // Última posición registrada para calcular distancia
+  Timer? _trainingTimer; // Timer para actualizar estadísticas cada segundo
+  final List<LatLng> _routePoints = []; // Puntos del recorrido para dibujar la ruta
 
   @override
   void initState() {
@@ -49,6 +64,7 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
 
   // Solicita permiso y obtiene la ubicación actual
   void _requestLocationPermission() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingLocation = true;
     });
@@ -59,6 +75,7 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
     if (!serviceEnabled) {
       serviceEnabled = await _location.requestService();
       if (!serviceEnabled) {
+        if (!mounted) return;
         setState(() {
           _isLoadingLocation = false;
         });
@@ -70,6 +87,7 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
     if (permissionGranted == PermissionStatus.denied) {
       permissionGranted = await _location.requestPermission();
       if (permissionGranted != PermissionStatus.granted) {
+        if (!mounted) return;
         setState(() {
           _isLoadingLocation = false;
         });
@@ -78,6 +96,7 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
     }
 
     final locationData = await _location.getLocation();
+    if (!mounted) return;
     setState(() {
       _currentPosition = LatLng(locationData.latitude!, locationData.longitude!);
       _isLoadingLocation = false;
@@ -111,27 +130,190 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
   }
 
   // --- Funciones para Iniciar/Parar ---
-  void _startTraining() {
+  Future<void> _startTraining() async {
+    if (!mounted) return;
+    // Verificar si podemos usar GPS; en caso contrario, activamos simulación
+    bool serviceEnabled = await _location.serviceEnabled();
+    PermissionStatus permissionGranted = await _location.hasPermission();
+    if (!serviceEnabled) {
+      serviceEnabled = await _location.requestService();
+    }
+    if (permissionGranted == PermissionStatus.denied) {
+      permissionGranted = await _location.requestPermission();
+    }
+    _simulateMode = !(serviceEnabled && permissionGranted == PermissionStatus.granted);
+
     setState(() {
       _isTraining = true;
+      // Inicializar estadísticas
+      _elapsedSeconds = 0;
+      _totalDistance = 0.0;
+      _pace = 0.0;
+      _lastPosition = _currentPosition;
+      _routePoints.clear();
+      _routePoints.add(_currentPosition);
     });
-    // Inicia el listener de ubicación si no lo has hecho
-    _location.onLocationChanged.listen((LocationData currentLocation) {
-      if (!_isTraining) return;
+
+    // Cancela suscripción anterior si existe
+    _locationSubscription?.cancel();
+    _trainingTimer?.cancel();
+
+    // Timer que actualiza las estadísticas cada segundo (también usaremos simulación aquí)
+    _trainingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!_isTraining || !mounted) return;
       setState(() {
-        _currentPosition = LatLng(currentLocation.latitude!, currentLocation.longitude!);
-        _mapController?.animateCamera(
-          CameraUpdate.newLatLng(_currentPosition),
-        );
+        _elapsedSeconds++;
+        if (_simulateMode) {
+          // Simulación simple: asumir un ritmo base (ej. 5:30 -> 330 segundos/km)
+          double basePaceSecPerKm = 330.0;
+          // Añadir una pequeña variación aleatoria para hacerlo más realista
+          double noise = (Random().nextDouble() - 0.5) * 4.0; // +-2s
+          double currentPaceSecPerKm = basePaceSecPerKm + noise;
+          double distanceIncrement = 1.0 / currentPaceSecPerKm; // km por segundo
+          _totalDistance += distanceIncrement;
+        }
+        // Actualizar ritmo (min/km)
+        if (_totalDistance > 0) {
+          _pace = (_elapsedSeconds / 60.0) / _totalDistance;
+        }
       });
     });
+
+    // Si no estamos en modo simulación, iniciamos el listener de ubicación
+    if (!_simulateMode) {
+      _locationSubscription = _location.onLocationChanged.listen((LocationData currentLocation) {
+        if (!_isTraining || !mounted) return;
+
+        final newPosition = LatLng(currentLocation.latitude!, currentLocation.longitude!);
+        setState(() {
+          _currentPosition = newPosition;
+          _routePoints.add(newPosition);
+
+          // Calcular distancia incremental desde la última posición
+          if (_lastPosition != null) {
+            double distance = _calculateDistance(_lastPosition!, newPosition);
+            _totalDistance += distance;
+          }
+          _lastPosition = newPosition;
+
+          _mapController?.animateCamera(
+            CameraUpdate.newLatLng(_currentPosition),
+          );
+        });
+      });
+    }
   }
 
   void _stopTraining() {
+    if (!mounted) return;
     setState(() {
       _isTraining = false;
     });
-    // Aquí guardarías el entrenamiento
+    // Cancela el listener de ubicación y el timer para evitar memory leak
+    _locationSubscription?.cancel();
+    _trainingTimer?.cancel();
+    // Guardar el entrenamiento en la base de datos (Firestore)
+    if (_elapsedSeconds > 0 && _totalDistance > 0) {
+      _saveSession();
+    }
+  }
+
+  Future<void> _saveSession() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final uid = user.uid;
+
+      final userDocRef = FirebaseFirestore.instance.collection('users').doc(uid);
+      final snapshot = await userDocRef.get();
+
+      double existingDistance = 0.0;
+      int existingTime = 0;
+      int existingSessions = 0;
+
+      if (snapshot.exists && snapshot.data() != null) {
+        final data = snapshot.data() as Map<String, dynamic>;
+        // Leer posibles nombres de campo compatibles
+        existingDistance = (data['totalDistance'] ?? data['total_distance'] ?? 0).toDouble();
+        existingTime = (data['total_time_seconds'] ?? data['totalTimeSeconds'] ?? 0).toInt();
+        existingSessions = (data['totalRuns'] ?? data['session_count'] ?? data['sessionCount'] ?? 0).toInt();
+      }
+
+      final newTotalDistance = existingDistance + _totalDistance;
+      final newTotalTime = existingTime + _elapsedSeconds;
+      final newSessionCount = existingSessions + 1;
+
+      // Calculamos nuevo ritmo promedio en min/km
+      double newAvgPaceMinPerKm = 0.0;
+      if (newTotalDistance > 0) {
+        newAvgPaceMinPerKm = (newTotalTime / 60.0) / newTotalDistance;
+      }
+
+      final sessionData = {
+        'date': Timestamp.now(),
+        'duration_seconds': _elapsedSeconds,
+        'distance_km': double.parse(_totalDistance.toStringAsFixed(3)),
+        'pace_min_per_km': double.parse(_pace.toStringAsFixed(3)),
+      };
+
+      await userDocRef.collection('sessions').add(sessionData);
+
+      // Actualizamos tanto campos camelCase como snake_case para compatibilidad
+      await userDocRef.set({
+        'totalDistance': double.parse(newTotalDistance.toStringAsFixed(3)),
+        'total_distance': double.parse(newTotalDistance.toStringAsFixed(3)),
+        'total_time_seconds': newTotalTime,
+        'totalTimeSeconds': newTotalTime,
+        'totalRuns': newSessionCount,
+        'session_count': newSessionCount,
+        'sessionCount': newSessionCount,
+        'averagePace': _formatPace(newAvgPaceMinPerKm),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('Error guardando sesión: $e');
+    }
+  }
+
+  // Calcula distancia entre dos puntos (Haversine formula) en km
+  double _calculateDistance(LatLng start, LatLng end) {
+    const double earthRadiusKm = 6371;
+    double dLat = _degreesToRadians(end.latitude - start.latitude);
+    double dLon = _degreesToRadians(end.longitude - start.longitude);
+    double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_degreesToRadians(start.latitude)) *
+            cos(_degreesToRadians(end.latitude)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+
+  double _degreesToRadians(double degrees) {
+    return degrees * pi / 180;
+  }
+
+  // Formatea tiempo transcurrido a MM:SS
+  String _formatTime(int seconds) {
+    int minutes = seconds ~/ 60;
+    int secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
+  // Formatea ritmo a MM:SS /km
+  String _formatPace(double pace) {
+    if (pace == 0) return '0:00';
+    int minutes = pace.toInt();
+    int seconds = ((pace - minutes) * 60).toInt();
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  void dispose() {
+    // Asegúrate de cancelar el listener cuando el widget se destruya
+    _locationSubscription?.cancel();
+    _trainingTimer?.cancel();
+    _mapController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -493,28 +675,17 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
             borderRadius: BorderRadius.circular(16),
             child: _isLoadingLocation
                 ? const Center(child: CircularProgressIndicator())
-                : GoogleMap(
-                    onMapCreated: (controller) {
-                      _mapController = controller;
-                    },
-                    initialCameraPosition: CameraPosition(
-                      target: _currentPosition,
-                      zoom: 15,
-                    ),
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                    zoomControlsEnabled: false,
-                  ),
+                : _buildGoogleMapSafe(),
           ),
         ),
         const SizedBox(height: 24),
-        // --- Estadísticas en vivo (simuladas) ---
+        // --- Estadísticas en vivo ---
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildLiveStat("RITMO", "5:30", "/km"),
-            _buildLiveStat("TIEMPO", "12:05", ""),
-            _buildLiveStat("DISTANCIA", "2.18", "km"),
+            _buildLiveStat("RITMO", _formatPace(_pace), "/km"),
+            _buildLiveStat("TIEMPO", _formatTime(_elapsedSeconds), ""),
+            _buildLiveStat("DISTANCIA", _totalDistance.toStringAsFixed(2), "km"),
           ],
         ),
         const SizedBox(height: 24),
@@ -535,6 +706,50 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
         ),
       ],
     );
+  }
+
+  /// Widget seguro para GoogleMap con manejo de errores
+  Widget _buildGoogleMapSafe() {
+    try {
+      return GoogleMap(
+        onMapCreated: (controller) {
+          if (mounted) {
+            _mapController = controller;
+          }
+        },
+        initialCameraPosition: CameraPosition(
+          target: _currentPosition,
+          zoom: 15,
+        ),
+        myLocationEnabled: true,
+        myLocationButtonEnabled: true,
+        zoomControlsEnabled: false,
+        onCameraMove: (CameraPosition position) {
+          // Evita problemas con setState durante animaciones
+          if (mounted && _isTraining) {
+            _currentPosition = position.target;
+          }
+        },
+      );
+    } catch (e) {
+      print("Error creando GoogleMap: $e");
+      return Container(
+        color: Colors.grey[300],
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.map, size: 48, color: Colors.grey),
+              SizedBox(height: 12),
+              Text(
+                'Error al cargar el mapa',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   static Widget _buildLiveStat(String title, String value, String unit) {
