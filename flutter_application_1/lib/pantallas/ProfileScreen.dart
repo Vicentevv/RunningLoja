@@ -97,37 +97,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _totalCarreras = "0";
   String _ritmoPromedio = "0:00";
   String _totalEventos = "0";
+  // Estadísticas calculadas en tiempo real
+  double _weeklyDistance = 0.0;
+  int _currentStreak = 0;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sessionsSubProfile;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSub;
 
   @override
   void initState() {
     super.initState();
     _loadUserProfile(); // cargar datos desde Firebase al iniciar
-    // Suscripción en tiempo real para actualizar perfil cuando cambie en Firestore
+    _listenToSessionsForProfile();
+  }
+
+  void _listenToSessionsForProfile() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      _profileSub = FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .snapshots()
-          .listen((snap) {
-        if (!mounted) return;
-        if (snap.exists && snap.data() != null) {
-          final data = snap.data() as Map<String, dynamic>;
-          setState(() {
-            _distanciaTotal = (data['totalDistance'] ?? data['total_distance'] ?? _distanciaTotal).toString();
-            _totalCarreras = (data['totalRuns'] ?? data['session_count'] ?? data['sessionCount'] ?? _totalCarreras).toString();
-            _ritmoPromedio = (data['averagePace'] ?? _ritmoPromedio).toString();
-            if (data['myEventIds'] != null && data['myEventIds'] is List) {
-              _totalEventos = (data['myEventIds'] as List).length.toString();
-            }
-          });
+    if (uid == null) return;
+
+    // Escuchamos sesiones para calcular km esta semana y racha
+    _sessionsSubProfile = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .snapshots()
+        .listen((qs) {
+      if (!mounted) return;
+      final now = DateTime.now();
+      final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+      double weeklyDistance = 0.0;
+      Set<String> days = {};
+
+      for (final doc in qs.docs) {
+        final data = doc.data();
+        if (data['date'] == null) continue;
+        DateTime date;
+        final d = data['date'];
+        if (d is Timestamp) {
+          date = d.toDate();
+        } else if (d is DateTime) {
+          date = d;
+        } else continue;
+
+        if (!date.isBefore(weekStart)) {
+          weeklyDistance += (data['distance_km'] ?? data['distance'] ?? 0).toDouble();
         }
-      }, onError: (e) {
-        // no bloquear la app por errores de suscripción
-        print('Profile listener error: $e');
+
+        final key = '${date.year.toString().padLeft(4,'0')}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
+        days.add(key);
+      }
+
+      // calcular racha
+      int streak = 0;
+      DateTime cursor = DateTime(now.year, now.month, now.day);
+      while (true) {
+        final key = '${cursor.year.toString().padLeft(4,'0')}-${cursor.month.toString().padLeft(2,'0')}-${cursor.day.toString().padLeft(2,'0')}';
+        if (days.contains(key)) {
+          streak++;
+          cursor = cursor.subtract(const Duration(days: 1));
+        } else break;
+      }
+
+      setState(() {
+        _weeklyDistance = weeklyDistance;
+        _currentStreak = streak;
+        // también actualizamos algunos campos mostrados en la UI si el documento de usuario cambió
       });
-    }
+    }, onError: (e) {
+      print('Error listening profile sessions: $e');
+    });
   }
 
   /// Carga los datos del perfil y estadísticas desde Firestore
@@ -191,6 +228,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void dispose() {
     _profileSub?.cancel();
+    _sessionsSubProfile?.cancel();
     super.dispose();
   }
 
@@ -342,8 +380,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: 'Comunidad',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.watch_later_outlined), // ICONO CORREGIDO
-            activeIcon: Icon(Icons.watch_later), // ICONO CORREGIDO
+            icon: Icon(Icons.play_arrow), // ICONO CORREGIDO
+            activeIcon: Icon(Icons.play_arrow_outlined), // ICONO CORREGIDO
             label: 'Entrenar',
           ),
         ],
@@ -491,15 +529,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       childAspectRatio: 1.8,
       children: [
         _buildStatItem(
-          _distanciaTotal, // Variable conectada a DB
-          "kilómetros",
-          "Distancia total",
+          _weeklyDistance.toStringAsFixed(1), // km esta semana
+          "km",
+          "Esta semana",
           Colors.blue[700]!,
         ),
         _buildStatItem(
-          _totalCarreras, // Variable conectada a DB
-          "Carreras",
-          "Carreras completadas",
+          _currentStreak.toString(), // racha actual
+          "días",
+          "Racha actual",
           Colors.green[600]!,
         ),
         _buildStatItem(

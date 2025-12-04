@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../servicios/AuthService.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'EventDetailScreen.dart';
 import 'EventosScreen.dart' show EventInfo;
@@ -30,8 +32,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String _fullName = "Cargando...";
   String _profilePic = "";
   double _kmSemana = 0;
-  int _calorias = 0;
+  int _racha = 0;
   int _eventos = 0;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sessionsSubHome;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSubHome;
 
   /// EVENTOS PARA LA SECCIÓN
   List<EventInfo> _proximosEventos = [];
@@ -41,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadUserName(); // <--- CARGAR NOMBRE AL INICIAR
+    _listenToUserStats();
     _loadUpcomingEvents(); // <--- CARGAR PRÓXIMOS EVENTOS
   }
 
@@ -102,6 +107,73 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       print("ERROR cargando nombre: $e");
     }
+  }
+
+  void _listenToUserStats() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    // Escuchamos el doc de usuario para contar eventos inscritos
+    _profileSubHome = FirebaseFirestore.instance.collection('users').doc(uid).snapshots().listen((snap) {
+      if (!mounted) return;
+      final data = snap.data();
+      if (data != null) {
+        int eventsCount = 0;
+        if (data['myEventIds'] != null && data['myEventIds'] is List) {
+          eventsCount = (data['myEventIds'] as List).length;
+        }
+        setState(() {
+          _eventos = eventsCount;
+        });
+      }
+    }, onError: (e) {
+      print('Home profile listen error: $e');
+    });
+
+    // Escuchamos sesiones para calcular km esta semana y racha
+    _sessionsSubHome = FirebaseFirestore.instance.collection('users').doc(uid).collection('sessions').snapshots().listen((qs) {
+      if (!mounted) return;
+      final now = DateTime.now();
+      final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+      double weeklyDistance = 0.0;
+      Set<String> days = {};
+
+      for (final doc in qs.docs) {
+        final data = doc.data();
+        if (data['date'] == null) continue;
+        DateTime date;
+        final d = data['date'];
+        if (d is Timestamp) {
+          date = d.toDate();
+        } else if (d is DateTime) {
+          date = d;
+        } else continue;
+
+        if (!date.isBefore(weekStart)) {
+          weeklyDistance += (data['distance_km'] ?? data['distance'] ?? 0).toDouble();
+        }
+
+        final key = "${date.year.toString().padLeft(4,'0')}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}";
+        days.add(key);
+      }
+
+      int streak = 0;
+      DateTime cursor = DateTime(now.year, now.month, now.day);
+      while (true) {
+        final key = "${cursor.year.toString().padLeft(4,'0')}-${cursor.month.toString().padLeft(2,'0')}-${cursor.day.toString().padLeft(2,'0')}";
+        if (days.contains(key)) {
+          streak++;
+          cursor = cursor.subtract(const Duration(days: 1));
+        } else break;
+      }
+
+      setState(() {
+        _kmSemana = weeklyDistance;
+        _racha = streak; // racha actual en días
+      });
+    }, onError: (e) {
+      print('Home sessions listen error: $e');
+    });
   }
 
   void _onNavBarTap(int index) {
@@ -241,13 +313,13 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildStatCard(
                 Icons.schedule,
                 'Esta semana',
-                _kmSemana.toString(), // ← desde Firestore
+                _kmSemana.toStringAsFixed(1), // ← km esta semana (formateado)
                 'KMS',
               ),
               _buildStatCard(
                 Icons.local_fire_department,
-                'Calorías',
-                _calorias.toString(), // ← desde Firestore
+                'Racha',
+                _racha.toString(), // ← días de racha
                 null,
               ),
               _buildStatCard(
@@ -790,5 +862,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    _sessionsSubHome?.cancel();
+    _profileSubHome?.cancel();
+    super.dispose();
   }
 }

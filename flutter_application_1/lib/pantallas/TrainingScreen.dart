@@ -31,12 +31,8 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  // Simulación de días de racha
-  final Set<DateTime> _streakDays = {
-    DateTime.now().subtract(const Duration(days: 1)),
-    DateTime.now().subtract(const Duration(days: 2)),
-    DateTime.now().subtract(const Duration(days: 4)),
-  };
+  // Días con sesión (para marcar en calendario)
+  Set<DateTime> _streakDays = {};
 
   // --- Para el Mapa y Ubicación ---
   GoogleMapController? _mapController;
@@ -54,12 +50,116 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
   LatLng? _lastPosition; // Última posición registrada para calcular distancia
   Timer? _trainingTimer; // Timer para actualizar estadísticas cada segundo
   final List<LatLng> _routePoints = []; // Puntos del recorrido para dibujar la ruta
+  // --- Datos históricos y calculados desde Firestore ---
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sessionsSub;
+  List<Map<String, dynamic>> _sessions = [];
+  double _weeklyDistance = 0.0;
+  int _weeklyTimeSeconds = 0;
+  double _weeklyPace = 0.0;
+  int _currentStreak = 0;
 
   @override
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
     _requestLocationPermission();
+    _listenToSessions();
+  }
+
+  void _listenToSessions() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    _sessionsSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .orderBy('date', descending: true)
+        .snapshots()
+        .listen((qs) {
+      if (!mounted) return;
+
+      final now = DateTime.now();
+      // Semana actual: consideramos lunes como inicio
+      final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+
+      List<Map<String, dynamic>> sessions = [];
+      double weeklyDistance = 0.0;
+      int weeklyTime = 0;
+      Set<String> sessionDateKeys = {};
+
+      for (final doc in qs.docs) {
+        final data = doc.data();
+        if (data['date'] == null) continue;
+        DateTime date;
+        try {
+          final d = data['date'];
+          if (d is Timestamp) {
+            date = d.toDate();
+          } else if (d is DateTime) {
+            date = d;
+          } else {
+            continue;
+          }
+        } catch (_) {
+          continue;
+        }
+
+        final session = Map<String, dynamic>.from(data);
+        session['date'] = date;
+        session['id'] = doc.id;
+        sessions.add(session);
+
+        // acumular semana actual
+        if (!date.isBefore(weekStart)) {
+          final dist = (session['distance_km'] ?? session['distance'] ?? session['distanceKm'] ?? 0).toDouble();
+          final dur = (session['duration_seconds'] ?? session['duration'] ?? 0);
+          weeklyDistance += dist;
+          weeklyTime += dur is int ? dur : (dur as num).toInt();
+        }
+
+        // registrar día (yyyy-mm-dd)
+        final key = '${date.year.toString().padLeft(4,'0')}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
+        sessionDateKeys.add(key);
+      }
+
+      // calcular racha actual (días consecutivos con sesión, desde hoy hacia atrás)
+      int streak = 0;
+      DateTime cursor = DateTime(now.year, now.month, now.day);
+      while (true) {
+        final key = '${cursor.year.toString().padLeft(4,'0')}-${cursor.month.toString().padLeft(2,'0')}-${cursor.day.toString().padLeft(2,'0')}';
+        if (sessionDateKeys.contains(key)) {
+          streak++;
+          cursor = cursor.subtract(const Duration(days: 1));
+        } else {
+          break;
+        }
+      }
+
+      // generar set de DateTime para marcar calendario
+      Set<DateTime> streakDays = {};
+      for (final k in sessionDateKeys) {
+        final parts = k.split('-');
+        final d = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+        streakDays.add(d);
+      }
+
+      double weeklyPace = 0.0;
+      if (weeklyDistance > 0) {
+        weeklyPace = (weeklyTime / 60.0) / weeklyDistance;
+      }
+
+      setState(() {
+        _sessions = sessions;
+        _weeklyDistance = weeklyDistance;
+        _weeklyTimeSeconds = weeklyTime;
+        _weeklyPace = weeklyPace;
+        _currentStreak = streak;
+        _streakDays = streakDays;
+      });
+    }, onError: (e) {
+      print('Error listening sessions: $e');
+    });
   }
 
   // Solicita permiso y obtiene la ubicación actual
@@ -307,12 +407,24 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
+  // Formatea duración a H:MM:SS o MM:SS si es menor a 1 hora
+  String _formatDurationHMS(int seconds) {
+    int h = seconds ~/ 3600;
+    int m = (seconds % 3600) ~/ 60;
+    int s = seconds % 60;
+    if (h > 0) {
+      return '${h.toString()}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
   @override
   void dispose() {
     // Asegúrate de cancelar el listener cuando el widget se destruya
     _locationSubscription?.cancel();
     _trainingTimer?.cancel();
     _mapController?.dispose();
+    _sessionsSub?.cancel();
     super.dispose();
   }
 
@@ -370,9 +482,9 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
           // Fila de Tarjetas de Estadísticas
           Row(
             children: [
-              _buildStatCard(Icons.directions_run, 'Esta semana', '23.6', 'kilómetros'),
+              _buildStatCard(Icons.directions_run, 'Esta semana', _weeklyDistance.toStringAsFixed(1), 'kilómetros'),
               const SizedBox(width: 16),
-              _buildStatCard(Icons.local_fire_department, 'Racha actual', '5', 'días 🔥'),
+              _buildStatCard(Icons.local_fire_department, 'Racha actual', _currentStreak.toString(), 'días 🔥'),
             ],
           ),
         ],
@@ -496,12 +608,37 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
   }
 
   Widget _buildHistoricoTab() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32.0),
-        child: Text('Aquí se mostrará tu historial de entrenamientos.',
-            textAlign: TextAlign.center),
-      ),
+    if (_sessions.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: Text('No hay entrenamientos registrados aún.', textAlign: TextAlign.center),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _sessions.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final s = _sessions[index];
+        final DateTime date = s['date'];
+        final dist = (s['distance_km'] ?? s['distance'] ?? 0).toDouble();
+        final dur = (s['duration_seconds'] ?? s['duration'] ?? 0);
+        final pace = (s['pace_min_per_km'] ?? s['pace'] ?? 0);
+
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: kPrimaryGreen.withOpacity(0.1),
+            child: Icon(Icons.directions_run, color: kPrimaryGreen),
+          ),
+          title: Text('${dist.toStringAsFixed(2)} km • ${_formatDurationHMS(dur is int ? dur : (dur as num).toInt())}'),
+          subtitle: Text('${date.day}/${date.month}/${date.year} • Ritmo ${_formatPace((pace is num) ? (pace as num).toDouble() : 0.0)}'),
+          trailing: Text(_formatDurationHMS(dur is int ? dur : (dur as num).toInt())),
+        );
+      },
     );
   }
 
@@ -799,9 +936,9 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildSummaryItem(Icons.timer_outlined, '2:10:50', 'Tiempo total'),
+                _buildSummaryItem(Icons.timer_outlined, _formatDurationHMS(_weeklyTimeSeconds), 'Tiempo total'),
                 Container(width: 1, height: 40, color: Colors.grey.shade300),
-                _buildSummaryItem(Icons.speed_outlined, '5:31 /km', 'Ritmo'),
+                _buildSummaryItem(Icons.speed_outlined, '${_formatPace(_weeklyPace)} /km', 'Ritmo'),
               ],
             ),
           ],
