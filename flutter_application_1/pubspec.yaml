@@ -37,6 +37,11 @@ dependencies:
   google_maps_flutter: ^2.5.0
   table_calendar: ^3.0.9
   location: ^5.0.1
+  firebase_core: ^4.2.1
+  cloud_firestore: ^6.1.0
+  firebase_auth: ^6.1.2
+  provider: ^6.1.5+1
+  image_picker: ^1.2.1
 
 dev_dependencies:
   flutter_test:

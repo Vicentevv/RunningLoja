@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/servicios/AuthService.dart';
 
 // --- Definición de Colores ---
 const Color kPrimaryGreen = Color(0xFF3A7D6E);
@@ -6,7 +7,6 @@ const Color kCardBackgroundColor = Colors.white;
 const Color kSecondaryTextColor = Color(0xFF666666);
 const Color kLightGrayBackground = Color(0xFFF4F6F8);
 const Color kPrimaryTextColor = Color(0xFF333333);
-
 
 // Puedes ejecutar esta aplicación pegando este código en tu archivo main.dart
 // de un proyecto Flutter nuevo.
@@ -41,11 +41,14 @@ class ProfileApp extends StatelessWidget {
       // (Añadí esto para que el ejemplo sea funcional)
       initialRoute: '/',
       routes: {
-         '/': (context) => const ProfileScreen(),
-         '/HomeScreen': (context) => const PlaceholderScreen(title: 'Home'),
-         '/EventosScreen': (context) => const PlaceholderScreen(title: 'Eventos'),
-         '/CommunityScreen': (context) => const PlaceholderScreen(title: 'Comunidad'),
-         '/TrainingScreen': (context) => const PlaceholderScreen(title: 'Entrenar'),
+        '/': (context) => const ProfileScreen(),
+        '/HomeScreen': (context) => const PlaceholderScreen(title: 'Home'),
+        '/EventosScreen': (context) =>
+            const PlaceholderScreen(title: 'Eventos'),
+        '/CommunityScreen': (context) =>
+            const PlaceholderScreen(title: 'Comunidad'),
+        '/TrainingScreen': (context) =>
+            const PlaceholderScreen(title: 'Entrenar'),
       },
       // ---
       debugShowCheckedModeBanner: false,
@@ -66,7 +69,6 @@ class PlaceholderScreen extends StatelessWidget {
   }
 }
 // --- FIN DE PLACEHOLDERS ---
-
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -106,7 +108,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProfileScreen(currentUserData: currentUserData),
+        builder: (context) =>
+            EditProfileScreen(currentUserData: currentUserData),
       ),
     );
 
@@ -191,7 +194,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Icon(
                 Icons.person_outline,
-                color: _selectedIndex == 2 ? kPrimaryGreen : kSecondaryTextColor,
+                color: _selectedIndex == 2
+                    ? kPrimaryGreen
+                    : kSecondaryTextColor,
               ),
             ),
             label: 'Perfil',
@@ -227,7 +232,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         break;
       case 2:
         // Ya estamos en Perfil
-        return; 
+        return;
       case 3:
         routeName = '/CommunityScreen';
         break;
@@ -237,7 +242,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       default:
         return;
     }
-    
+
     Navigator.pushReplacementNamed(context, routeName);
   }
 
@@ -247,9 +252,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
       decoration: BoxDecoration(
         color: Colors.teal[600],
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(30),
-        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
       ),
       child: Column(
         children: [
@@ -259,9 +262,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Text(
                 "Mi perfil",
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               Container(
                 decoration: BoxDecoration(
@@ -286,16 +289,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 backgroundColor: Colors.white.withOpacity(0.3),
               ),
               const SizedBox(width: 15),
-              Expanded( // Añadido Expanded para evitar overflow
+              Expanded(
+                // Añadido Expanded para evitar overflow
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       _nombre, // Usa la variable
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -326,9 +330,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
       ),
     );
   }
@@ -343,8 +347,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       mainAxisSpacing: 16,
       childAspectRatio: 1.8,
       children: [
-        _buildStatItem("156,8", "kilómetros", "Distancia total", Colors.blue[700]!),
-        _buildStatItem("24", "Carreras", "Carreras completadas", Colors.green[600]!),
+        _buildStatItem(
+          "156,8",
+          "kilómetros",
+          "Distancia total",
+          Colors.blue[700]!,
+        ),
+        _buildStatItem(
+          "24",
+          "Carreras",
+          "Carreras completadas",
+          Colors.green[600]!,
+        ),
         _buildStatItem("5:45", "min/km", "Ritmo", Colors.orange[700]!),
         _buildStatItem("3", "Eventos", "Eventos", Colors.purple[600]!),
       ],
@@ -388,13 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
         ],
       ),
     );
@@ -411,8 +419,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildInfoItem(Icons.height, "$_alturaCm cm", "Altura"), // Usa variable
-            _buildInfoItem(Icons.monitor_weight_outlined, "$_pesoKg kg", "Peso"), // Usa variable
+            _buildInfoItem(
+              Icons.straighten, // <-- icono corregido
+              "$_alturaCm cm",
+              "Altura",
+            ),
+            _buildInfoItem(
+              Icons.monitor_weight_outlined,
+              "$_pesoKg kg",
+              "Peso",
+            ),
           ],
         ),
       ),
@@ -426,19 +442,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
       ],
     );
   }
@@ -498,7 +505,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildAchievedItem(
-      IconData icon, String label, Color bgColor, Color iconColor) {
+    IconData icon,
+    String label,
+    Color bgColor,
+    Color iconColor,
+  ) {
     // (Sin cambios)
     return Container(
       decoration: BoxDecoration(
@@ -552,7 +563,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// Tarjeta con la lista de "Configuración"
   Widget _buildSettingsList() {
-    // (Sin cambios)
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
@@ -572,31 +582,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Colors.orange,
           ),
           const Divider(height: 1, indent: 20, endIndent: 20),
-          _buildSettingsItem(
-            Icons.lock_outline,
-            "Privacidad",
-            Colors.blue,
-          ),
+          _buildSettingsItem(Icons.lock_outline, "Privacidad", Colors.blue),
           const Divider(height: 1, indent: 20, endIndent: 20),
+
+          // 👇 ESTE ES EL IMPORTANTE
           _buildSettingsItem(
             Icons.logout,
             "Cerrar sesión",
             Colors.red,
+            onTap: () async {
+              await AuthService().logout();
+
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/LoginScreen',
+                  (route) => false,
+                );
+              }
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSettingsItem(IconData icon, String title, Color iconColor) {
-    // (Sin cambios)
+  Widget _buildSettingsItem(
+    IconData icon,
+    String title,
+    Color iconColor, {
+    VoidCallback? onTap,
+  }) {
     return ListTile(
       leading: Icon(icon, color: iconColor),
       title: Text(title),
       trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-      onTap: () {
-        // Acción para este ítem de configuración
-      },
+      onTap: onTap ?? () {}, // si no envías nada, no hace nada
     );
   }
 }
@@ -607,7 +628,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 class EditProfileScreen extends StatefulWidget {
   final Map<String, String> currentUserData;
-  
+
   const EditProfileScreen({super.key, required this.currentUserData});
 
   @override
@@ -616,7 +637,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+
   // Controladores para los campos del formulario
   late TextEditingController _nombreController;
   late TextEditingController _emailController;
@@ -629,12 +650,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     // Inicializa los controladores con los datos actuales
-    _nombreController = TextEditingController(text: widget.currentUserData['nombre']);
-    _emailController = TextEditingController(text: widget.currentUserData['email']);
-    _descripcionController = TextEditingController(text: widget.currentUserData['descripcion']);
-    _alturaController = TextEditingController(text: widget.currentUserData['altura']);
-    _pesoController = TextEditingController(text: widget.currentUserData['peso']);
-    _objetivoController = TextEditingController(text: widget.currentUserData['objetivo']);
+    _nombreController = TextEditingController(
+      text: widget.currentUserData['nombre'],
+    );
+    _emailController = TextEditingController(
+      text: widget.currentUserData['email'],
+    );
+    _descripcionController = TextEditingController(
+      text: widget.currentUserData['descripcion'],
+    );
+    _alturaController = TextEditingController(
+      text: widget.currentUserData['altura'],
+    );
+    _pesoController = TextEditingController(
+      text: widget.currentUserData['peso'],
+    );
+    _objetivoController = TextEditingController(
+      text: widget.currentUserData['objetivo'],
+    );
   }
 
   @override
@@ -661,7 +694,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'peso': _pesoController.text,
         'objetivo': _objetivoController.text,
       };
-      
+
       // Regresa a la pantalla anterior (ProfileScreen) y pasa el mapa
       Navigator.pop(context, updatedData);
     }
@@ -674,7 +707,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       appBar: AppBar(
         title: const Text(
           'Editar Perfil',
-          style: TextStyle(color: kPrimaryTextColor, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: kPrimaryTextColor,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.white,
         elevation: 1,
@@ -690,7 +726,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 fontSize: 16,
               ),
             ),
-          )
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -703,7 +739,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               Center(
                 child: CircleAvatar(
                   radius: 50,
-                  backgroundImage: NetworkImage(widget.currentUserData['avatarUrl']!),
+                  backgroundImage: NetworkImage(
+                    widget.currentUserData['avatarUrl']!,
+                  ),
                   child: Stack(
                     children: [
                       Positioned(
@@ -713,9 +751,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           decoration: BoxDecoration(
                             color: kPrimaryGreen,
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2)
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
-                          child: const Icon(Icons.edit, color: Colors.white, size: 20),
+                          child: const Icon(
+                            Icons.edit,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
                       ),
                     ],
@@ -744,9 +786,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 24),
               Text(
                 'Información física',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               Row(
@@ -773,11 +815,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-               Text(
+              Text(
                 'Mis objetivos',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               _buildTextFormField(

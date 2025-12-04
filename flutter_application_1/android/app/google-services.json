@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "91810779138",
+    "firebase_url": "https://running-loja-default-rtdb.firebaseio.com",
+    "project_id": "running-loja",
+    "storage_bucket": "running-loja.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:91810779138:android:9705e5c1573398d5f8171b",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAi3Frz-bzw3eIaENNhxOvioVOexJqYo2E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

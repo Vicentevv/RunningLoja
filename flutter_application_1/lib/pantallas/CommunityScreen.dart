@@ -35,7 +35,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
     // Asegúrate de que las rutas coincidan con tu app.
     if (index == 0) {
       // Navegar a Inicio (HomeScreen)
-      Navigator.pushReplacementNamed(context, '/HomeScreen'); // O la ruta que uses
+      Navigator.pushReplacementNamed(
+        context,
+        '/HomeScreen',
+      ); // O la ruta que uses
     }
     if (index == 1) {
       // Navegar a Eventos
@@ -53,7 +56,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -69,7 +71,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 _buildTabSwitcher(),
                 // Espacio para el contenido del tab
                 _buildTabContent(),
-                const SizedBox(height: 100), // Espacio extra para el FAB y BottomNav
+                const SizedBox(
+                  height: 100,
+                ), // Espacio extra para el FAB y BottomNav
               ],
             ),
           ),
@@ -96,7 +100,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
   /// Construye el Header verde de la comunidad
   Widget _buildCommunityHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 60, 24, 24), // Ajustado para el status bar
+      padding: const EdgeInsets.fromLTRB(
+        24,
+        60,
+        24,
+        24,
+      ), // Ajustado para el status bar
       decoration: const BoxDecoration(
         color: kPrimaryGreen,
         borderRadius: BorderRadius.only(
@@ -320,9 +329,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
             child: Text(
               'TÍME', // TODO: Reemplazar con el logo o iniciales del usuario
               style: TextStyle(
-                  color: kPrimaryGreen,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12),
+                color: kPrimaryGreen,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -381,7 +391,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 child: Text(
                   initials,
                   style: TextStyle(
-                      color: avatarColor, fontWeight: FontWeight.bold),
+                    color: avatarColor,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -399,8 +411,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ),
                     Text(
                       '$level • $time',
-                      style:
-                          TextStyle(color: kSecondaryTextColor, fontSize: 14),
+                      style: TextStyle(
+                        color: kSecondaryTextColor,
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
@@ -417,7 +431,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
           // Contenido del Post
           Text(
             text,
-            style: TextStyle(color: kPrimaryTextColor, fontSize: 16, height: 1.4),
+            style: TextStyle(
+              color: kPrimaryTextColor,
+              fontSize: 16,
+              height: 1.4,
+            ),
           ),
           // Imagen (si existe)
           if (hasImage)
@@ -432,7 +450,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     color: Colors.grey[200],
                     image: DecorationImage(
                       // Estoy usando un placeholder de red, reemplaza con tu imagen
-                      image: NetworkImage('https://picsum.photos/seed/${name.hashCode}/600/400'),
+                      image: NetworkImage(
+                        'https://picsum.photos/seed/${name.hashCode}/600/400',
+                      ),
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -448,18 +468,27 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 children: [
                   Icon(Icons.favorite, color: Colors.red, size: 22),
                   const SizedBox(width: 6),
-                  Text('$likes',
-                      style: TextStyle(
-                          color: kSecondaryTextColor,
-                          fontWeight: FontWeight.w500)),
+                  Text(
+                    '$likes',
+                    style: TextStyle(
+                      color: kSecondaryTextColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   const SizedBox(width: 24),
-                  Icon(Icons.chat_bubble_outline,
-                      color: kSecondaryTextColor, size: 22),
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    color: kSecondaryTextColor,
+                    size: 22,
+                  ),
                   const SizedBox(width: 6),
-                  Text('$comments',
-                      style: TextStyle(
-                          color: kSecondaryTextColor,
-                          fontWeight: FontWeight.w500)),
+                  Text(
+                    '$comments',
+                    style: TextStyle(
+                      color: kSecondaryTextColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ],
               ),
               Icon(Icons.share_outlined, color: kSecondaryTextColor, size: 22),
@@ -532,7 +561,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // --- AÑADIDO: Método para construir el BottomNavBar ---
   /// Barra de Navegación Inferior
   Widget _buildBottomNavBar() {
     return BottomNavigationBar(
@@ -563,7 +591,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               // El círculo verde solo aparece cuando está activo
-              color: _bottomNavIndex == 2 ? kPrimaryGreen.withOpacity(0.1) : Colors.transparent,
+              color: _bottomNavIndex == 2
+                  ? kPrimaryGreen.withOpacity(0.1)
+                  : Colors.transparent,
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -573,7 +603,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ),
           label: 'Perfil',
         ),
-        const BottomNavigationBarItem( 
+        const BottomNavigationBarItem(
           icon: Icon(Icons.people_outline),
           activeIcon: Icon(Icons.people),
           label: 'Comunidad',

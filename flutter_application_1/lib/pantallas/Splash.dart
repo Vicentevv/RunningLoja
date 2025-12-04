@@ -1,6 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/pantallas/Bienvenida.dart';
 import 'dart:async';
+
+// IMPORTA tus pantallas:
+import 'package:flutter_application_1/pantallas/HomeScreen.dart';
+import 'package:flutter_application_1/pantallas/LoginScreen.dart';
 
 // ====================================================================
 // CLASE AUXILIAR DE ANIMACIÓN: _StaggeredDotCurve (sin cambios)
@@ -8,7 +12,7 @@ import 'dart:async';
 class _StaggeredDotCurve extends Curve {
   final double begin;
   final double end;
-  
+
   const _StaggeredDotCurve({required this.begin, required this.end});
 
   @override
@@ -44,6 +48,8 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+
+    // Animaciones (NO se toca)
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -68,7 +74,7 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
       ),
     );
 
-    _navigatetoHome();
+    _checkUserSession();
   }
 
   @override
@@ -77,17 +83,30 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  _navigatetoHome() async {
-    await Future.delayed(const Duration(milliseconds: 3000));
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const WelcomeScreen(),
-      ),
-    );
+  // 🚀 NUEVA LÓGICA: Decide a dónde ir después del splash
+  Future<void> _checkUserSession() async {
+    await Future.delayed(const Duration(seconds: 6)); // Tu tiempo del splash
+
+    User? user = FirebaseAuth.instance.currentUser;
+
+    if (!mounted) return;
+
+    if (user != null) {
+      // Usuario ya inició sesión -> ir directo a HOME
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } else {
+      // No hay usuario -> ir a LOGIN (o bienvenida si quieres)
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    }
   }
 
-  // Widget auxiliar para crear un punto animado
+  // Widget auxiliar para crear un punto animado (NO TOCAR)
   Widget _buildAnimatedDot(Animation<double> animation) {
     return AnimatedBuilder(
       animation: _controller,
@@ -115,7 +134,7 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            // Logo/Icono de RunLoja
+            // Logo/Icono
             Container(
               width: 200,
               height: 200,
@@ -126,20 +145,20 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
               ),
               child: ClipOval(
                 child: Image(
-                  image: const AssetImage('/LogoRunLoja.png'),
+                  image: const AssetImage('assets/LogoRunLoja.png'),
                   fit: BoxFit.cover,
                 ),
               ),
             ),
             const SizedBox(height: 30),
 
-            // Título de la App con fuente Pacifico
+            // Título
             const Text(
               'RunLoja',
               style: TextStyle(
-                fontFamily: 'Pacifico', // <--- ¡AQUÍ SE APLICA LA FUENTE!
-                fontSize: 48, // Un poco más grande para el estilo Pacifico
-                fontWeight: FontWeight.bold, // Pacifico ya es audaz, pero lo mantenemos
+                fontFamily: 'Pacifico',
+                fontSize: 48,
+                fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
             ),
@@ -148,14 +167,11 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
             // Subtítulo
             const Text(
               'Tu comunidad de running',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.white70,
-              ),
+              style: TextStyle(fontSize: 18, color: Colors.white70),
             ),
             const SizedBox(height: 40),
 
-            // Indicador de Carga ANIMADO
+            // Indicador animado
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -168,13 +184,10 @@ class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
             ),
             const SizedBox(height: 40),
 
-            // Texto de Carga
+            // Texto de carga
             const Text(
               'Cargando tu experiencia de running...',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white54,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.white54),
             ),
           ],
         ),

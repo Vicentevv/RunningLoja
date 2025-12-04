@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../servicios/AuthService.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-// --- Definición de Colores (Ajusta estos colores a tu tema) ---
-const Color kPrimaryGreen = Color(0xFF3A7D6E); // Un verde oscuro para el header
+// --- Definición de Colores ---
+const Color kPrimaryGreen = Color(0xFF3A7D6E);
 const Color kLightGreenBackground = Color(0xFFF0F5F3);
 const Color kCardBackgroundColor = Colors.white;
 const Color kPrimaryTextColor = Color(0xFF333333);
@@ -18,28 +20,58 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0; // Índice para el BottomNavBar
-  bool _showNotifications = false; // Estado para mostrar el panel
+  int _selectedIndex = 0;
+  bool _showNotifications = false;
+
+  /// ESTE NOMBRE ES EL QUE SE VA A MOSTRAR EN EL HEADER
+  String _fullName = "Cargando...";
+  String _profilePic = "";
+  double _kmSemana = 0;
+  int _calorias = 0;
+  int _eventos = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName(); // <--- CARGAR NOMBRE AL INICIAR
+  }
+
+  /// ----------------------------------------------------------
+  /// FUNCIÓN PARA CARGAR EL NOMBRE DEL USUARIO LOGUEADO
+  /// ----------------------------------------------------------
+  Future<void> _loadUserName() async {
+    try {
+      final auth = AuthService();
+      final snapshot = await auth.getUserData();
+
+      if (snapshot != null && snapshot.data() != null) {
+        final data = snapshot.data() as Map<String, dynamic>;
+
+        setState(() {
+          _fullName = data["fullName"] ?? "Usuario";
+        });
+      } else {
+        setState(() {
+          _fullName = "Usuario";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _fullName = "Usuario";
+      });
+      print("ERROR cargando nombre: $e");
+    }
+  }
 
   void _onNavBarTap(int index) {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 0) {
-      // Ya estamos en Home, no hacemos nada
-    }
-    if (index == 1) {
-      Navigator.pushNamed(context, '/EventosScreen');
-    }
-    if (index == 2) {
-      Navigator.pushNamed(context, '/ProfileScreen');
-    }
-    if (index == 3) {
-      Navigator.pushNamed(context, '/CommunityScreen');
-    }
-    if (index == 4) {
-      Navigator.pushNamed(context, '/TrainingScreen');
-    }
+
+    if (index == 1) Navigator.pushNamed(context, '/EventosScreen');
+    if (index == 2) Navigator.pushNamed(context, '/ProfileScreen');
+    if (index == 3) Navigator.pushNamed(context, '/CommunityScreen');
+    if (index == 4) Navigator.pushNamed(context, '/TrainingScreen');
   }
 
   void _toggleNotifications() {
@@ -52,31 +84,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kLightGreenBackground,
-      // Usamos un Stack para poder superponer el panel de notificaciones
       body: Stack(
         children: [
-          // Contenido principal de la pantalla
           GestureDetector(
             onTap: () {
-              // Oculta el panel si se toca fuera de él
-              if (_showNotifications) {
-                _toggleNotifications();
-              }
+              if (_showNotifications) _toggleNotifications();
             },
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeader(),
+                  _buildHeader(), // YA MUESTRA EL NOMBRE REAL
                   _buildQuickAccess(),
                   _buildUpcomingEvents(),
-                  const SizedBox(height: 24), // Espacio al final
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
           ),
 
-          // Panel de Notificaciones (se muestra condicionalmente)
           if (_showNotifications) _buildNotificationPanel(),
         ],
       ),
@@ -84,7 +110,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Construye el Header verde de bienvenida y estadísticas
+  /// ----------------------------------------------------------
+  /// HEADER -> Reemplazo SOLO el nombre
+  /// ----------------------------------------------------------
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
@@ -98,23 +126,21 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Fila de Saludo y Notificaciones
+          /// ---------- FILA SUPERIOR (Nombre + Foto + Notificaciones) ----------
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              /// NOMBRE Y SALUDO
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     '¡Hola!',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
                   ),
                   Text(
-                    'Carlos Mendoza',
-                    style: TextStyle(
+                    _fullName, // ← NOMBRE REAL
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -122,11 +148,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              // Stack para el ícono de campana con la insignia
+
+              /// NOTIFICACIONES
               Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 30),
+                    icon: const Icon(
+                      Icons.notifications_outlined,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                     onPressed: _toggleNotifications,
                   ),
                   Positioned(
@@ -138,10 +169,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.red,
                         shape: BoxShape.circle,
                       ),
-                      constraints: const BoxConstraints(
-                        minWidth: 18,
-                        minHeight: 18,
-                      ),
                       child: const Text(
                         '2',
                         style: TextStyle(
@@ -149,7 +176,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
-                        textAlign: TextAlign.center,
                       ),
                     ),
                   ),
@@ -157,22 +183,38 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
+
           const SizedBox(height: 16),
+
           const Text(
             '¡Listo para tu próxima carrera! 🏃',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 16),
           ),
+
           const SizedBox(height: 24),
-          // Fila de Tarjetas de Estadísticas
+
+          /// ---------- ESTADÍSTICAS REALES ----------
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatCard(Icons.schedule, 'Esta semana', '12,5', 'kilómetros'),
-              _buildStatCard(Icons.local_fire_department, 'Calorías', '850', null),
-              _buildStatCard(Icons.emoji_events, 'Eventos', '3', null),
+              _buildStatCard(
+                Icons.schedule,
+                'Esta semana',
+                _kmSemana.toString(), // ← desde Firestore
+                'KMS',
+              ),
+              _buildStatCard(
+                Icons.local_fire_department,
+                'Calorías',
+                _calorias.toString(), // ← desde Firestore
+                null,
+              ),
+              _buildStatCard(
+                Icons.emoji_events,
+                'Eventos',
+                _eventos.toString(), // ← desde Firestore
+                null,
+              ),
             ],
           ),
         ],
@@ -181,7 +223,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Tarjeta individual para las estadísticas en el header
-  Widget _buildStatCard(IconData icon, String title, String value, String? unit) {
+  Widget _buildStatCard(
+    IconData icon,
+    String title,
+    String value,
+    String? unit,
+  ) {
     return Expanded(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 6),
@@ -195,7 +242,10 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(icon, color: Colors.white, size: 28),
             const SizedBox(height: 8),
-            Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            Text(
+              title,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
             const SizedBox(height: 4),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -216,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: const TextStyle(color: Colors.white70, fontSize: 10),
                   ),
               ],
-            )
+            ),
           ],
         ),
       ),
@@ -239,18 +289,49 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          GridView.count(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            shrinkWrap: true, // Para que funcione dentro de SingleChildScrollView
-            physics: const NeverScrollableScrollPhysics(), // Desactiva scroll de GridView
+          // Primera fila con 2 tarjetas
+          Row(
             children: [
-              _buildAccessCard(Icons.event, 'Eventos', 'Próximas carreras', kAccentDarkGreen),
-              _buildAccessCard(Icons.people, 'Comunidad', 'Conecta con corredores', kAccentBlue),
-              _buildAccessCard(Icons.fitness_center, 'Entrenar', 'Planes de entrenamiento', kAccentOrange),
-              _buildAccessCard(Icons.map_outlined, 'Rutas', 'Explora Loja', kPrimaryGreen),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/EventosScreen'),
+                  child: _buildAccessCard(
+                    Icons.event,
+                    'Eventos',
+                    'Próximas carreras',
+                    kAccentDarkGreen,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/CommunityScreen'),
+                  child: _buildAccessCard(
+                    Icons.people,
+                    'Comunidad',
+                    'Conecta con corredores',
+                    kAccentBlue,
+                  ),
+                ),
+              ),
             ],
+          ),
+          const SizedBox(height: 16),
+          // Segunda fila con tarjeta centrada
+          Center(
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.51,
+              child: GestureDetector(
+                onTap: () => Navigator.pushNamed(context, '/TrainingScreen'),
+                child: _buildAccessCard(
+                  Icons.fitness_center,
+                  'Entrenar',
+                  'Planes de entrenamiento',
+                  kAccentOrange,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -258,7 +339,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Tarjeta individual para el "Acceso rápido"
-  Widget _buildAccessCard(IconData icon, String title, String subtitle, Color iconColor) {
+  Widget _buildAccessCard(
+    IconData icon,
+    String title,
+    String subtitle,
+    Color iconColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -321,37 +407,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () => Navigator.pushNamed(context, '/EventosScreen'),
                 child: const Text(
                   'Ver todos',
-                  style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: kPrimaryGreen,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          _buildEventCard(
-            'assets/runner.png', // Reemplaza con tu asset
-            'Maratón Ciudad de Loja',
-            '15 de febrero • 6:00 AM',
-            'Centro de Loja',
-            '245 inscrit...',
-          ),
-          const SizedBox(height: 16),
-          _buildEventCard(
-            'assets/hiker.png', // Reemplaza con tu asset
-            'Podocarpo para correr por senderos',
-            '22 de febrero • 7:00 AM',
-            'Parque Podocarpo...',
-            '89 inscrit...',
-          ),
         ],
       ),
     );
   }
 
   /// Tarjeta individual para un "Evento"
-  Widget _buildEventCard(String imagePath, String title, String dateTime, String location, String participants) {
+  Widget _buildEventCard(
+    String imagePath,
+    String title,
+    String dateTime,
+    String location,
+    String participants,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -382,7 +462,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 fit: BoxFit.cover,
                 // Fallback por si la imagen no carga
                 errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.sports, color: kPrimaryGreen, size: 40);
+                  return const Icon(
+                    Icons.sports,
+                    color: kPrimaryGreen,
+                    size: 40,
+                  );
                 },
               ),
             ),
@@ -404,9 +488,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_outlined, color: kSecondaryTextColor, size: 14),
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      color: kSecondaryTextColor,
+                      size: 14,
+                    ),
                     const SizedBox(width: 6),
-                    Text(dateTime, style: TextStyle(color: kSecondaryTextColor, fontSize: 14)),
+                    Text(
+                      dateTime,
+                      style: TextStyle(
+                        color: kSecondaryTextColor,
+                        fontSize: 14,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -417,12 +511,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: Row(
                         children: [
-                          Icon(Icons.location_on_outlined, color: kSecondaryTextColor, size: 14),
+                          Icon(
+                            Icons.location_on_outlined,
+                            color: kSecondaryTextColor,
+                            size: 14,
+                          ),
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
                               location,
-                              style: TextStyle(color: kSecondaryTextColor, fontSize: 14),
+                              style: TextStyle(
+                                color: kSecondaryTextColor,
+                                fontSize: 14,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -432,12 +533,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: Row(
                         children: [
-                          Icon(Icons.person_outline, color: kSecondaryTextColor, size: 14),
+                          Icon(
+                            Icons.person_outline,
+                            color: kSecondaryTextColor,
+                            size: 14,
+                          ),
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
                               participants,
-                              style: TextStyle(color: kSecondaryTextColor, fontSize: 14),
+                              style: TextStyle(
+                                color: kSecondaryTextColor,
+                                fontSize: 14,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -484,10 +592,38 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              _buildNotificationItem(Icons.event_available, kAccentDarkGreen, 'Nuevo evento disponible', 'Maratón Ciudad de Loja - Inscripciones abiertas', '2 minutos', true),
-              _buildNotificationItem(Icons.person_add, kAccentBlue, 'Nuevo seguidor', 'Maria González comenzó a seguirte', '15 minutos', false),
-              _buildNotificationItem(Icons.emoji_events, kAccentOrange, '¡Logro desbloqueado!', 'Has puesto 50 km este mes', '1 hora', false),
-              _buildNotificationItem(Icons.alarm, Colors.redAccent, 'Recordatorio de entrenamiento', 'Es hora de tu carrera matutina', '2 horas', false),
+              _buildNotificationItem(
+                Icons.event_available,
+                kAccentDarkGreen,
+                'Nuevo evento disponible',
+                'Maratón Ciudad de Loja - Inscripciones abiertas',
+                '2 minutos',
+                true,
+              ),
+              _buildNotificationItem(
+                Icons.person_add,
+                kAccentBlue,
+                'Nuevo seguidor',
+                'Maria González comenzó a seguirte',
+                '15 minutos',
+                false,
+              ),
+              _buildNotificationItem(
+                Icons.emoji_events,
+                kAccentOrange,
+                '¡Logro desbloqueado!',
+                'Has puesto 50 km este mes',
+                '1 hora',
+                false,
+              ),
+              _buildNotificationItem(
+                Icons.alarm,
+                Colors.redAccent,
+                'Recordatorio de entrenamiento',
+                'Es hora de tu carrera matutina',
+                '2 horas',
+                false,
+              ),
             ],
           ),
         ),
@@ -496,7 +632,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Item individual para la lista de notificaciones
-  Widget _buildNotificationItem(IconData icon, Color iconColor, String title, String subtitle, String time, bool hasDot) {
+  Widget _buildNotificationItem(
+    IconData icon,
+    Color iconColor,
+    String title,
+    String subtitle,
+    String time,
+    bool hasDot,
+  ) {
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
@@ -506,7 +649,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Icon(icon, color: iconColor),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+      ),
       subtitle: Row(
         children: [
           if (hasDot)
@@ -514,7 +660,10 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 6,
               height: 6,
               margin: const EdgeInsets.only(right: 6),
-              decoration: const BoxDecoration(color: kAccentBlue, shape: BoxShape.circle),
+              decoration: const BoxDecoration(
+                color: kAccentBlue,
+                shape: BoxShape.circle,
+              ),
             ),
           Expanded(
             child: Text(
@@ -526,7 +675,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      trailing: Text(time, style: const TextStyle(color: kSecondaryTextColor, fontSize: 10)),
+      trailing: Text(
+        time,
+        style: const TextStyle(color: kSecondaryTextColor, fontSize: 10),
+      ),
       onTap: () {
         // Lógica al tocar una notificación
         _toggleNotifications(); // Cierra el panel
@@ -564,7 +716,9 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               // El círculo verde solo aparece cuando está activo
-              color: _selectedIndex == 2 ? kPrimaryGreen.withOpacity(0.1) : Colors.transparent,
+              color: _selectedIndex == 2
+                  ? kPrimaryGreen.withOpacity(0.1)
+                  : Colors.transparent,
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -574,7 +728,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           label: 'Perfil',
         ),
-        const BottomNavigationBarItem( 
+        const BottomNavigationBarItem(
           icon: Icon(Icons.people_outline),
           activeIcon: Icon(Icons.people),
           label: 'Comunidad',
