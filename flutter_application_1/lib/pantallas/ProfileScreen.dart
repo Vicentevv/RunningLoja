@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/modelos/UserModel.dart';
+import 'package:flutter_application_1/pantallas/EditProfileScreen.dart';
 import 'package:flutter_application_1/servicios/AuthService.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // para leer/guardar perfil
 import 'package:firebase_auth/firebase_auth.dart';
@@ -81,23 +85,12 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _selectedIndex = 2; 
+  int _selectedIndex = 2;
 
-  // --- VARIABLES DE DATOS DEL PERFIL ---
-  String _nombre = '';
-  String _email = '';
-  String _descripcion = '';
-  String _avatarUrl = '';
-  String _alturaCm = '--'; // Valor por defecto visual
-  String _pesoKg = '--';   // Valor por defecto visual
-  String _objetivo = '';
+  // --- MODELO DE USUARIO EN LUGAR DE VARIABLES LOCALES ---
+  UserModel? _user;
 
-  // --- VARIABLES DE ESTADÍSTICAS (NUEVAS) ---
-  String _distanciaTotal = "0";
-  String _totalCarreras = "0";
-  String _ritmoPromedio = "0:00";
-  String _totalEventos = "0";
-  // Estadísticas calculadas en tiempo real
+  // --- VARIABLES DE ESTADÍSTICAS CALCULADAS (MANTENIDAS COMO LOCALES YA QUE SE CALCULAN EN TIEMPO REAL) ---
   double _weeklyDistance = 0.0;
   int _currentStreak = 0;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sessionsSubProfile;
@@ -120,104 +113,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .doc(uid)
         .collection('sessions')
         .snapshots()
-        .listen((qs) {
-      if (!mounted) return;
-      final now = DateTime.now();
-      final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
-      double weeklyDistance = 0.0;
-      Set<String> days = {};
+        .listen(
+          (qs) {
+            if (!mounted) return;
+            final now = DateTime.now();
+            final weekStart = DateTime(
+              now.year,
+              now.month,
+              now.day,
+            ).subtract(Duration(days: now.weekday - 1));
+            double weeklyDistance = 0.0;
+            Set<String> days = {};
 
-      for (final doc in qs.docs) {
-        final data = doc.data();
-        if (data['date'] == null) continue;
-        DateTime date;
-        final d = data['date'];
-        if (d is Timestamp) {
-          date = d.toDate();
-        } else if (d is DateTime) {
-          date = d;
-        } else continue;
+            for (final doc in qs.docs) {
+              final data = doc.data();
+              if (data['date'] == null) continue;
+              DateTime date;
+              final d = data['date'];
+              if (d is Timestamp) {
+                date = d.toDate();
+              } else if (d is DateTime) {
+                date = d;
+              } else
+                continue;
 
-        if (!date.isBefore(weekStart)) {
-          weeklyDistance += (data['distance_km'] ?? data['distance'] ?? 0).toDouble();
-        }
+              if (!date.isBefore(weekStart)) {
+                weeklyDistance += (data['distance_km'] ?? data['distance'] ?? 0)
+                    .toDouble();
+              }
 
-        final key = '${date.year.toString().padLeft(4,'0')}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
-        days.add(key);
-      }
+              final key =
+                  '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+              days.add(key);
+            }
 
-      // calcular racha
-      int streak = 0;
-      DateTime cursor = DateTime(now.year, now.month, now.day);
-      while (true) {
-        final key = '${cursor.year.toString().padLeft(4,'0')}-${cursor.month.toString().padLeft(2,'0')}-${cursor.day.toString().padLeft(2,'0')}';
-        if (days.contains(key)) {
-          streak++;
-          cursor = cursor.subtract(const Duration(days: 1));
-        } else break;
-      }
+            // calcular racha
+            int streak = 0;
+            DateTime cursor = DateTime(now.year, now.month, now.day);
+            while (true) {
+              final key =
+                  '${cursor.year.toString().padLeft(4, '0')}-${cursor.month.toString().padLeft(2, '0')}-${cursor.day.toString().padLeft(2, '0')}';
+              if (days.contains(key)) {
+                streak++;
+                cursor = cursor.subtract(const Duration(days: 1));
+              } else
+                break;
+            }
 
-      setState(() {
-        _weeklyDistance = weeklyDistance;
-        _currentStreak = streak;
-        // también actualizamos algunos campos mostrados en la UI si el documento de usuario cambió
-      });
-    }, onError: (e) {
-      print('Error listening profile sessions: $e');
-    });
+            setState(() {
+              _weeklyDistance = weeklyDistance;
+              _currentStreak = streak;
+              // también actualizamos algunos campos mostrados en la UI si el documento de usuario cambió
+            });
+          },
+          onError: (e) {
+            print('Error listening profile sessions: $e');
+          },
+        );
   }
 
-  /// Carga los datos del perfil y estadísticas desde Firestore
+  /// Carga los datos del perfil y estadísticas desde Firestore usando el modelo
   Future<void> _loadUserProfile() async {
     try {
       final auth = AuthService();
       final snapshot = await auth.getUserData();
 
       if (snapshot != null && snapshot.exists && snapshot.data() != null) {
-        final data = snapshot.data() as Map<String, dynamic>;
-
         if (!mounted) return;
         setState(() {
-          // --- DATOS PERSONALES ---
-          _nombre = data["fullName"] ?? _nombre;
-          _email = data["email"] ?? _email;
-          _descripcion = data["role"] ?? _descripcion; // Usamos 'role' como descripción o el campo que prefieras
-          
-          // Conversión segura de números a String para altura y peso
-          _alturaCm = (data["height"] != null && data["height"] != 0) 
-              ? data["height"].toString() 
-              : "--";
-          
-          _pesoKg = (data["weight"] != null && data["weight"] != 0) 
-              ? data["weight"].toString() 
-              : "--";
-              
-          _objetivo = data["currentGoal"] ?? "Sin objetivo definido";
-
-          if (data["photoUrl"] != null && data["photoUrl"].toString().isNotEmpty) {
-            _avatarUrl = data["photoUrl"];
-          }
-
-          // --- ESTADÍSTICAS (NUEVO) ---
-          
-          // 1. Distancia Total (totalDistance)
-          if (data["totalDistance"] != null) {
-            // Convertimos a String, si quieres formatear decimales puedes usar .toStringAsFixed(1)
-            _distanciaTotal = data["totalDistance"].toString();
-          }
-
-          // 2. Carreras Totales (totalRuns)
-          if (data["totalRuns"] != null) {
-            _totalCarreras = data["totalRuns"].toString();
-          }
-
-          // 3. Ritmo Promedio (averagePace)
-          _ritmoPromedio = data["averagePace"] ?? "0:00";
-
-          // 4. Eventos (myEventIds es un array, contamos su longitud)
-          if (data["myEventIds"] != null && data["myEventIds"] is List) {
-            _totalEventos = (data["myEventIds"] as List).length.toString();
-          }
+          _user = UserModel.fromDocument(snapshot);
         });
       }
     } catch (e) {
@@ -234,15 +198,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// NAVEGA A LA PANTALLA DE EDICIÓN
   void _navigateToEditProfile() async {
-    // Mapa con datos actuales para enviar al formulario
+    // Mapa con datos actuales para enviar al formulario, extraídos del modelo
     final Map<String, String> currentUserData = {
-      'nombre': _nombre,
-      'email': _email,
-      'descripcion': _descripcion,
-      'altura': _alturaCm == "--" ? "" : _alturaCm, // Enviamos vacío si es -- para que no estorbe al editar
-      'peso': _pesoKg == "--" ? "" : _pesoKg,
-      'objetivo': _objetivo,
-      'avatarUrl': _avatarUrl,
+      'nombre': _user?.fullName ?? '',
+      'email': _user?.email ?? '',
+      'descripcion': _user?.role ?? '',
+      'altura': _user?.height != null && _user!.height != 0
+          ? _user!.height.toString()
+          : '',
+      'peso': _user?.weight != null && _user!.weight != 0
+          ? _user!.weight.toString()
+          : '',
+      'objetivo': _user?.currentGoal ?? '',
+      'avatarUrl':
+          '', // No se usa directamente, pero si necesitas pasar base64: _user?.avatarBase64 ?? ''
     };
 
     final result = await Navigator.push(
@@ -255,14 +224,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (result != null && result is Map<String, String>) {
       if (!mounted) return;
-      // Actualizamos UI localmente
+      // Actualizamos el modelo localmente con los nuevos valores (mutando los campos directamente)
       setState(() {
-        _nombre = result['nombre'] ?? _nombre;
-        // _email = result['email'] ?? _email; // Generalmente el email no se cambia aquí
-        _descripcion = result['descripcion'] ?? _descripcion;
-        _alturaCm = result['altura']?.isEmpty ?? true ? "--" : result['altura']!;
-        _pesoKg = result['peso']?.isEmpty ?? true ? "--" : result['peso']!;
-        _objetivo = result['objetivo'] ?? _objetivo;
+        if (_user != null) {
+          _user!.fullName = result['nombre'] ?? _user!.fullName;
+          _user!.role = result['descripcion'] ?? _user!.role;
+          _user!.height =
+              double.tryParse(result['altura'] ?? '') ?? _user!.height;
+          _user!.weight =
+              double.tryParse(result['peso'] ?? '') ?? _user!.weight;
+          _user!.currentGoal = result['objetivo'] ?? _user!.currentGoal;
+          // Si editas avatarBase64, agrégalo aquí: _user!.avatarBase64 = result['avatarBase64'] ?? _user!.avatarBase64;
+        }
       });
 
       // Guardamos en Firebase
@@ -274,27 +247,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveProfileToFirebase(Map<String, String> newData) async {
     try {
       final auth = AuthService();
-      final String? uid = auth.getCurrentUserId(); // Asegúrate de tener este método en AuthService o usa auth.currentUser?.uid
-      
+      final String? uid = auth
+          .getCurrentUserId(); // Asegúrate de tener este método en AuthService o usa auth.currentUser?.uid
+
       // Si no tienes getCurrentUserId, puedes usar:
-      // final uid = FirebaseAuth.instance.currentUser?.uid; 
-      
+      // final uid = FirebaseAuth.instance.currentUser?.uid;
+
       if (uid == null) return;
 
       // Convertimos Strings numéricos a int/double para la BD
-      int? newHeight = int.tryParse(newData['altura'] ?? "");
-      int? newWeight = int.tryParse(newData['peso'] ?? "");
+      double? newHeight = double.tryParse(newData['altura'] ?? "");
+      double? newWeight = double.tryParse(newData['peso'] ?? "");
 
       final Map<String, dynamic> updateMap = <String, dynamic>{};
-      
-      updateMap['fullName'] = newData['nombre'];
-      updateMap['role'] = newData['descripcion']; // Mapeamos 'descripcion' a 'role' según tu BD
-      updateMap['height'] = newHeight ?? 0;
-      updateMap['weight'] = newWeight ?? 0;
-      updateMap['currentGoal'] = newData['objetivo']; // Mapeamos a 'currentGoal'
 
-      await FirebaseFirestore.instance.collection('users').doc(uid).update(updateMap);
-      
+      updateMap['fullName'] = newData['nombre'];
+      updateMap['role'] =
+          newData['descripcion']; // Mapeamos 'descripcion' a 'role' según tu BD
+      updateMap['height'] = newHeight ?? 0.0;
+      updateMap['weight'] = newWeight ?? 0.0;
+      updateMap['currentGoal'] =
+          newData['objetivo']; // Mapeamos a 'currentGoal'
+      // Si editas avatarBase64, agrégalo aquí: updateMap['avatarBase64'] = newData['avatarBase64'];
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .update(updateMap);
     } catch (e) {
       print("Error guardando perfil: $e");
     }
@@ -457,16 +436,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             children: [
               CircleAvatar(
-                radius: 35,
-                backgroundColor: _avatarUrl.isNotEmpty
-                    ? Colors.white.withOpacity(0.3)
-                    : kPrimaryGreen.withOpacity(0.8),
-                backgroundImage:
-                    _avatarUrl.isNotEmpty ? NetworkImage(_avatarUrl) : null,
-                child: _avatarUrl.isEmpty
-                    ? const Icon(Icons.person, size: 40, color: Colors.white)
+                radius: 50,
+                backgroundImage: (_user?.avatarBase64 ?? '').isNotEmpty
+                    ? MemoryImage(base64Decode(_user!.avatarBase64))
+                    : null,
+                child: (_user?.avatarBase64 ?? '').isEmpty
+                    ? Icon(Icons.person, size: 50, color: Colors.white)
                     : null,
               ),
+
               const SizedBox(width: 15),
               Expanded(
                 // Añadido Expanded para evitar overflow
@@ -474,23 +452,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _nombre.isNotEmpty ? _nombre : 'Usuario',
+                      _user?.fullName ?? 'Usuario',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    if (_email.isNotEmpty)
+                    if ((_user?.email ?? '').isNotEmpty)
                       Text(
-                        _email,
+                        _user!.email,
                         style: TextStyle(color: Colors.white.withOpacity(0.9)),
                         overflow: TextOverflow.ellipsis,
                       ),
                     const SizedBox(height: 4),
-                    if (_descripcion.isNotEmpty)
+                    if ((_user?.role ?? '').isNotEmpty)
                       Text(
-                        _descripcion,
+                        _user!.role,
                         style: TextStyle(color: Colors.white.withOpacity(0.9)),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -541,13 +519,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Colors.green[600]!,
         ),
         _buildStatItem(
-          _ritmoPromedio, // Variable conectada a DB
+          _user?.averagePace ?? '0:00', // Del modelo
           "min/km",
           "Ritmo",
           Colors.orange[700]!,
         ),
         _buildStatItem(
-          _totalEventos, // Variable conectada a DB
+          _user?.myEventIds.length.toString() ?? '0', // Del modelo
           "Eventos",
           "Eventos inscritos",
           Colors.purple[600]!,
@@ -601,6 +579,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// Tarjeta para la "Información física"
   Widget _buildInfoCard() {
+    final alturaCm = (_user?.height != null && _user!.height != 0)
+        ? '${_user!.height} cm'
+        : '-- cm';
+    final pesoKg = (_user?.weight != null && _user!.weight != 0)
+        ? '${_user!.weight} kg'
+        : '-- kg';
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -612,14 +597,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             _buildInfoItem(
               Icons.straighten, // <-- icono corregido
-              "$_alturaCm cm",
+              alturaCm,
               "Altura",
             ),
-            _buildInfoItem(
-              Icons.monitor_weight_outlined,
-              "$_pesoKg kg",
-              "Peso",
-            ),
+            _buildInfoItem(Icons.monitor_weight_outlined, pesoKg, "Peso"),
           ],
         ),
       ),
@@ -649,7 +630,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       color: Colors.white,
       child: ListTile(
         leading: const Icon(Icons.flag_outlined, color: Colors.teal),
-        title: Text(_objetivo), // Usa la variable
+        title: Text(
+          _user?.currentGoal ?? 'Sin objetivo definido',
+        ), // Del modelo
         minLeadingWidth: 0,
       ),
     );
@@ -809,252 +792,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: Text(title),
       trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       onTap: onTap ?? () {}, // si no envías nada, no hace nada
-    );
-  }
-}
-
-// ===================================================================
-// ---         NUEVA PANTALLA PARA EDITAR EL PERFIL          ---
-// ===================================================================
-
-class EditProfileScreen extends StatefulWidget {
-  final Map<String, String> currentUserData;
-
-  const EditProfileScreen({super.key, required this.currentUserData});
-
-  @override
-  _EditProfileScreenState createState() => _EditProfileScreenState();
-}
-
-class _EditProfileScreenState extends State<EditProfileScreen> {
-  final _formKey = GlobalKey<FormState>();
-
-  // Controladores para los campos del formulario
-  late TextEditingController _nombreController;
-  late TextEditingController _emailController;
-  late TextEditingController _descripcionController;
-  late TextEditingController _alturaController;
-  late TextEditingController _pesoController;
-  late TextEditingController _objetivoController;
-
-  @override
-  void initState() {
-    super.initState();
-    // Inicializa los controladores con los datos actuales
-    _nombreController = TextEditingController(
-      text: widget.currentUserData['nombre'],
-    );
-    _emailController = TextEditingController(
-      text: widget.currentUserData['email'],
-    );
-    _descripcionController = TextEditingController(
-      text: widget.currentUserData['descripcion'],
-    );
-    _alturaController = TextEditingController(
-      text: widget.currentUserData['altura'],
-    );
-    _pesoController = TextEditingController(
-      text: widget.currentUserData['peso'],
-    );
-    _objetivoController = TextEditingController(
-      text: widget.currentUserData['objetivo'],
-    );
-  }
-
-  @override
-  void dispose() {
-    // Limpia los controladores cuando el widget se destruye
-    _nombreController.dispose();
-    _emailController.dispose();
-    _descripcionController.dispose();
-    _alturaController.dispose();
-    _pesoController.dispose();
-    _objetivoController.dispose();
-    super.dispose();
-  }
-
-  /// Guarda el formulario y regresa a la pantalla anterior
-  void _onSave() {
-    if (_formKey.currentState!.validate()) {
-      // Crea un mapa con los nuevos datos
-      final Map<String, String> updatedData = {
-        'nombre': _nombreController.text,
-        'email': _emailController.text,
-        'descripcion': _descripcionController.text,
-        'altura': _alturaController.text,
-        'peso': _pesoController.text,
-        'objetivo': _objetivoController.text,
-      };
-
-      // Regresa a la pantalla anterior (ProfileScreen) y pasa el mapa
-      Navigator.pop(context, updatedData);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kLightGrayBackground,
-      appBar: AppBar(
-        title: const Text(
-          'Editar Perfil',
-          style: TextStyle(
-            color: kPrimaryTextColor,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        iconTheme: const IconThemeData(color: kPrimaryTextColor),
-        actions: [
-          TextButton(
-            onPressed: _onSave,
-            child: const Text(
-              'Guardar',
-              style: TextStyle(
-                color: kPrimaryGreen,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundColor: kPrimaryGreen.withOpacity(0.8),
-                  backgroundImage: (widget.currentUserData['avatarUrl']?.isNotEmpty ?? false)
-                      ? NetworkImage(widget.currentUserData['avatarUrl']!)
-                      : null,
-                  child: Stack(
-                    children: [
-                      if ((widget.currentUserData['avatarUrl']?.isEmpty ?? true))
-                        const Icon(Icons.person, size: 60, color: Colors.white),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: kPrimaryGreen,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(
-                            Icons.edit,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              _buildTextFormField(
-                controller: _nombreController,
-                label: 'Nombre completo',
-                icon: Icons.person_outline,
-              ),
-              const SizedBox(height: 16),
-              _buildTextFormField(
-                controller: _emailController,
-                label: 'Correo electrónico',
-                icon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-                readOnly: true,
-              ),
-              const SizedBox(height: 16),
-              _buildTextFormField(
-                controller: _descripcionController,
-                label: 'Descripción (Role)',
-                icon: Icons.info_outline,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Información física',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextFormField(
-                      controller: _alturaController,
-                      label: 'Altura',
-                      icon: Icons.height,
-                      suffixText: 'cm',
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextFormField(
-                      controller: _pesoController,
-                      label: 'Peso',
-                      icon: Icons.monitor_weight_outlined,
-                      suffixText: 'kg',
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Mis objetivos',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              _buildTextFormField(
-                controller: _objetivoController,
-                label: 'Objetivo principal',
-                icon: Icons.flag_outlined,
-                maxLines: 3,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Widget de helper para crear un campo de texto estilizado
-  Widget _buildTextFormField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    String? suffixText,
-    TextInputType keyboardType = TextInputType.text,
-    int maxLines = 1,
-    bool readOnly = false,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      readOnly: readOnly,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: kSecondaryTextColor),
-        prefixIcon: Icon(icon, color: kPrimaryGreen),
-        suffixText: suffixText,
-        suffixStyle: const TextStyle(color: kSecondaryTextColor),
-        filled: true,
-        fillColor: readOnly ? Colors.grey[200] : Colors.white,
-      ),
-      validator: (value) => (value == null || value.isEmpty) ? 'Este campo no puede estar vacío' : null,
     );
   }
 }

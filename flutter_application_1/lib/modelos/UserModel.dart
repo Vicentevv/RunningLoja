@@ -4,26 +4,26 @@ class UserModel {
   String uid;
   String fullName;
   String email;
-  String photoUrl;
+  String avatarBase64; // ⬅️ NUEVO
   DateTime createdAt;
 
-  double totalDistance; // km
+  double totalDistance;
   int totalRuns;
-  String averagePace; // Ej: 5:30 min/km
-  int streakDays; // racha de días seguidos
+  String averagePace;
+  int streakDays;
 
-  String currentGoal; // objetivo actual (texto)
+  String currentGoal;
   List<String> myEventIds;
 
-  double height; // estatura
-  double weight; // peso
-  String role; // "runner", "admin", etc.
+  double height;
+  double weight;
+  String role;
 
   UserModel({
     required this.uid,
     required this.fullName,
     required this.email,
-    required this.photoUrl,
+    required this.avatarBase64, // ⬅️ nuevo
     required this.createdAt,
     required this.totalDistance,
     required this.totalRuns,
@@ -36,13 +36,12 @@ class UserModel {
     required this.role,
   });
 
-  //Convertir a JSON para guardar en Firestore
   Map<String, dynamic> toJson() {
     return {
       "uid": uid,
       "fullName": fullName,
       "email": email,
-      "photoUrl": photoUrl,
+      "avatarBase64": avatarBase64, // ⬅️ nuevo
       "createdAt": createdAt.toIso8601String(),
       "totalDistance": totalDistance,
       "totalRuns": totalRuns,
@@ -56,13 +55,12 @@ class UserModel {
     };
   }
 
-  //Leer modelo desde JSON
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       uid: json["uid"],
       fullName: json["fullName"],
       email: json["email"],
-      photoUrl: json["photoUrl"],
+      avatarBase64: json["avatarBase64"] ?? "", // ⬅️ nuevo
       createdAt: DateTime.parse(json["createdAt"]),
       totalDistance: json["totalDistance"].toDouble(),
       totalRuns: json["totalRuns"],
@@ -76,7 +74,6 @@ class UserModel {
     );
   }
 
-  /// 📄 Leer modelo desde Firestore (DocumentSnapshot)
   factory UserModel.fromDocument(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
 
@@ -84,7 +81,7 @@ class UserModel {
       uid: data["uid"],
       fullName: data["fullName"],
       email: data["email"],
-      photoUrl: data["photoUrl"],
+      avatarBase64: data["avatarBase64"] ?? "", // ⬅️ nuevo
       createdAt: DateTime.parse(data["createdAt"]),
       totalDistance: data["totalDistance"].toDouble(),
       totalRuns: data["totalRuns"],

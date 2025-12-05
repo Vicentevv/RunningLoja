@@ -52,7 +52,6 @@ class _RegistroScreenState extends State<RegistroScreen> {
         uid: uid,
         fullName: _nameController.text.trim(),
         email: _emailController.text.trim(),
-        photoUrl: '',
         createdAt: DateTime.now(),
         totalDistance: 0,
         totalRuns: 0,
@@ -63,6 +62,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
         height: 0,
         weight: 0,
         role: "runner",
+        avatarBase64: '',
       );
 
       await FirebaseFirestore.instance

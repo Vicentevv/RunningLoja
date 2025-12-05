@@ -114,66 +114,90 @@ class _HomeScreenState extends State<HomeScreen> {
     if (uid == null) return;
 
     // Escuchamos el doc de usuario para contar eventos inscritos
-    _profileSubHome = FirebaseFirestore.instance.collection('users').doc(uid).snapshots().listen((snap) {
-      if (!mounted) return;
-      final data = snap.data();
-      if (data != null) {
-        int eventsCount = 0;
-        if (data['myEventIds'] != null && data['myEventIds'] is List) {
-          eventsCount = (data['myEventIds'] as List).length;
-        }
-        setState(() {
-          _eventos = eventsCount;
-        });
-      }
-    }, onError: (e) {
-      print('Home profile listen error: $e');
-    });
+    _profileSubHome = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .listen(
+          (snap) {
+            if (!mounted) return;
+            final data = snap.data();
+            if (data != null) {
+              int eventsCount = 0;
+              if (data['myEventIds'] != null && data['myEventIds'] is List) {
+                eventsCount = (data['myEventIds'] as List).length;
+              }
+              setState(() {
+                _eventos = eventsCount;
+              });
+            }
+          },
+          onError: (e) {
+            print('Home profile listen error: $e');
+          },
+        );
 
     // Escuchamos sesiones para calcular km esta semana y racha
-    _sessionsSubHome = FirebaseFirestore.instance.collection('users').doc(uid).collection('sessions').snapshots().listen((qs) {
-      if (!mounted) return;
-      final now = DateTime.now();
-      final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
-      double weeklyDistance = 0.0;
-      Set<String> days = {};
+    _sessionsSubHome = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .snapshots()
+        .listen(
+          (qs) {
+            if (!mounted) return;
+            final now = DateTime.now();
+            final weekStart = DateTime(
+              now.year,
+              now.month,
+              now.day,
+            ).subtract(Duration(days: now.weekday - 1));
+            double weeklyDistance = 0.0;
+            Set<String> days = {};
 
-      for (final doc in qs.docs) {
-        final data = doc.data();
-        if (data['date'] == null) continue;
-        DateTime date;
-        final d = data['date'];
-        if (d is Timestamp) {
-          date = d.toDate();
-        } else if (d is DateTime) {
-          date = d;
-        } else continue;
+            for (final doc in qs.docs) {
+              final data = doc.data();
+              if (data['date'] == null) continue;
+              DateTime date;
+              final d = data['date'];
+              if (d is Timestamp) {
+                date = d.toDate();
+              } else if (d is DateTime) {
+                date = d;
+              } else
+                continue;
 
-        if (!date.isBefore(weekStart)) {
-          weeklyDistance += (data['distance_km'] ?? data['distance'] ?? 0).toDouble();
-        }
+              if (!date.isBefore(weekStart)) {
+                weeklyDistance += (data['distance_km'] ?? data['distance'] ?? 0)
+                    .toDouble();
+              }
 
-        final key = "${date.year.toString().padLeft(4,'0')}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}";
-        days.add(key);
-      }
+              final key =
+                  "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+              days.add(key);
+            }
 
-      int streak = 0;
-      DateTime cursor = DateTime(now.year, now.month, now.day);
-      while (true) {
-        final key = "${cursor.year.toString().padLeft(4,'0')}-${cursor.month.toString().padLeft(2,'0')}-${cursor.day.toString().padLeft(2,'0')}";
-        if (days.contains(key)) {
-          streak++;
-          cursor = cursor.subtract(const Duration(days: 1));
-        } else break;
-      }
+            int streak = 0;
+            DateTime cursor = DateTime(now.year, now.month, now.day);
+            while (true) {
+              final key =
+                  "${cursor.year.toString().padLeft(4, '0')}-${cursor.month.toString().padLeft(2, '0')}-${cursor.day.toString().padLeft(2, '0')}";
+              if (days.contains(key)) {
+                streak++;
+                cursor = cursor.subtract(const Duration(days: 1));
+              } else
+                break;
+            }
 
-      setState(() {
-        _kmSemana = weeklyDistance;
-        _racha = streak; // racha actual en días
-      });
-    }, onError: (e) {
-      print('Home sessions listen error: $e');
-    });
+            setState(() {
+              _kmSemana = weeklyDistance;
+              _racha = streak; // racha actual en días
+            });
+          },
+          onError: (e) {
+            print('Home sessions listen error: $e');
+          },
+        );
   }
 
   void _onNavBarTap(int index) {
@@ -308,25 +332,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
           /// ---------- ESTADÍSTICAS REALES ----------
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatCard(
-                Icons.schedule,
-                'Esta semana',
-                _kmSemana.toStringAsFixed(1), // ← km esta semana (formateado)
-                'KMS',
+              Expanded(
+                child: _buildStatCard(
+                  Icons.schedule,
+                  'Esta semana',
+                  _kmSemana.toStringAsFixed(1),
+                  'kms',
+                ),
               ),
-              _buildStatCard(
-                Icons.local_fire_department,
-                'Racha',
-                _racha.toString(), // ← días de racha
-                null,
+              const SizedBox(width: 7),
+              Expanded(
+                child: _buildStatCard(
+                  Icons.local_fire_department,
+                  'Racha',
+                  _racha.toString(),
+                  null,
+                ),
               ),
-              _buildStatCard(
-                Icons.emoji_events,
-                'Eventos',
-                _eventos.toString(), // ← desde Firestore
-                null,
+              const SizedBox(width: 7),
+              Expanded(
+                child: _buildStatCard(
+                  Icons.emoji_events,
+                  'Eventos',
+                  _eventos.toString(),
+                  null,
+                ),
               ),
             ],
           ),
@@ -342,46 +373,49 @@ class _HomeScreenState extends State<HomeScreen> {
     String value,
     String? unit,
   ) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: Colors.white, size: 28),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+    return Container(
+      constraints: const BoxConstraints(
+        minHeight: 120, // ← hace la tarjeta más grande y uniforme
+      ),
+      margin: const EdgeInsets.symmetric(horizontal: 1),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.20),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.white, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+
+          // Valor + unidad
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
                 ),
-                if (unit != null) const SizedBox(width: 4),
-                if (unit != null)
-                  Text(
-                    unit,
-                    style: const TextStyle(color: Colors.white70, fontSize: 10),
-                  ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              if (unit != null) const SizedBox(width: 4),
+              if (unit != null)
+                Text(
+                  unit,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -533,13 +567,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
           if (_loadingEventos)
-            const Center(
-              child: CircularProgressIndicator(),
-            )
+            const Center(child: CircularProgressIndicator())
           else if (_proximosEventos.isEmpty)
-            const Center(
-              child: Text('No hay eventos disponibles'),
-            )
+            const Center(child: Text('No hay eventos disponibles'))
           else
             Column(
               children: _proximosEventos
@@ -552,16 +582,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Tarjeta individual para un "Evento" - IDÉNTICA A EventosScreen
-  Widget _buildEventCard(
-    EventInfo evento,
-  ) {
+  Widget _buildEventCard(EventInfo evento) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => EventDetailScreen(event: evento),
-          ),
+          MaterialPageRoute(builder: (_) => EventDetailScreen(event: evento)),
         );
       },
       child: Container(
@@ -595,7 +621,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: Colors.grey[300],
                             width: 80,
                             height: 110,
-                            child: const Icon(Icons.image_not_supported, size: 40),
+                            child: const Icon(
+                              Icons.image_not_supported,
+                              size: 40,
+                            ),
                           ),
                         );
                       } catch (e) {
@@ -609,23 +638,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       }
                     })()
                   : evento.imageUrl.startsWith('assets/')
-                      ? Image.asset(
-                          evento.imageUrl,
-                          width: 80,
-                          height: 110,
-                          fit: BoxFit.cover,
-                        )
-                      : Image.network(
-                          evento.imageUrl,
-                          width: 80,
-                          height: 110,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.image_not_supported,
-                                size: 40),
-                          ),
-                        ),
+                  ? Image.asset(
+                      evento.imageUrl,
+                      width: 80,
+                      height: 110,
+                      fit: BoxFit.cover,
+                    )
+                  : Image.network(
+                      evento.imageUrl,
+                      width: 80,
+                      height: 110,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.image_not_supported, size: 40),
+                      ),
+                    ),
             ),
             const SizedBox(width: 12),
             Expanded(

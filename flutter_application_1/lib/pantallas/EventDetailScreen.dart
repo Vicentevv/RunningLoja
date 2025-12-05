@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/pantallas/EventosScreen.dart';
 import 'dart:convert';
@@ -43,6 +44,7 @@ class EventDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 100),
               child: Column(
                 children: [
+                  const SizedBox(height: 16),
                   _buildStatsSection(),
                   const SizedBox(height: 16),
                   _buildInfoCard(
@@ -134,7 +136,7 @@ class EventDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   _buildContactCard(),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -188,19 +190,19 @@ class EventDetailScreen extends StatelessWidget {
                   }
                 })()
               : event.imageUrl.startsWith('assets/')
-                  ? Image.asset(event.imageUrl, fit: BoxFit.cover)
-                  : Image.network(
-                      event.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: Colors.grey[300],
-                        child: const Icon(
-                          Icons.image_not_supported,
-                          size: 60,
-                          color: Colors.grey,
-                        ),
-                      ),
+              ? Image.asset(event.imageUrl, fit: BoxFit.cover)
+              : Image.network(
+                  event.imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: Colors.grey[300],
+                    child: const Icon(
+                      Icons.image_not_supported,
+                      size: 60,
+                      color: Colors.grey,
                     ),
+                  ),
+                ),
         ),
         Container(
           height: 300,
@@ -248,13 +250,6 @@ class EventDetailScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            _tag(event.categoria, const Color(0xFF27AE60)),
-            const SizedBox(width: 10),
-            _tag(event.tipo, const Color(0xFF3498DB)),
-          ],
-        ),
         const SizedBox(height: 8),
         Text(
           event.nombre,
@@ -407,6 +402,7 @@ class EventDetailScreen extends StatelessWidget {
   // ==================== INFO CARD ======================
   Widget _buildInfoCard({required String title, required Widget child}) {
     return Container(
+      width: double.infinity, // ← obliga a usar todo el ancho
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -457,7 +453,13 @@ class EventDetailScreen extends StatelessWidget {
           ),
           onPressed: yaLleno
               ? null
-              : () {
+              : () async {
+                  final doc = FirebaseFirestore.instance
+                      .collection('eventos')
+                      .doc(event.id);
+
+                  await doc.update({'inscritos': event.inscritos + 1});
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text("¡Te has inscrito al evento!"),
@@ -465,7 +467,11 @@ class EventDetailScreen extends StatelessWidget {
                       duration: Duration(seconds: 2),
                     ),
                   );
+
+                  Navigator.pop(context);
                 },
+
+          // ⬇️⬇️⬇️ ESTE ES EL CHILD QUE TE FALTABA
           child: Text(
             yaLleno ? "Cupo lleno" : "Inscribirme ahora",
             style: const TextStyle(
@@ -474,6 +480,7 @@ class EventDetailScreen extends StatelessWidget {
               color: Colors.white,
             ),
           ),
+          // ⬆️⬆️⬆️ ESTE ES EL CHILD QUE TE FALTABA
         ),
       ),
     );
