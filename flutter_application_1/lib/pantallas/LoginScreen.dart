@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/pantallas/ForgotPasswordScreen.dart';
 
 // Definición de colores principales
 const Color _kPrimaryColor = Color(0xFF4C7C63);
@@ -202,13 +203,17 @@ class _LoginScreenState extends State<LoginScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: GestureDetector(
-                onTap: () {}, // Aquí puedes luego poner recuperar password
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ForgotPasswordScreen(),
+                    ),
+                  );
+                },
                 child: const Text(
                   '¿Olvidaste tu contraseña?',
-                  style: TextStyle(
-                    color: _kPrimaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  // ... estilos ...
                 ),
               ),
             ),

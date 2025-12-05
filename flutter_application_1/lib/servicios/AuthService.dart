@@ -26,22 +26,19 @@ class AuthService {
         "email": email,
         "photoUrl": "",
         "createdAt": FieldValue.serverTimestamp(),
-
         // Datos físicos
         "height": 0,
         "weight": 0,
-
         // Estadísticas globales
         "totalDistance": 0,
         "totalRuns": 0,
         "averagePace": "0:00",
         "streakDays": 0,
-
         // Objetivos
         "currentGoal": "",
         "myEventIds": [],
-
-        // Entrenamientos (se almacenarán en subcolecciones)
+        // Entrenamientos
+        "role": "runner", // Por defecto
       });
 
       return null; // Éxito
@@ -70,6 +67,20 @@ class AuthService {
   }
 
   /// ============================================================
+  /// 🔥 NUEVO: ENVIAR CORREO DE RECUPERACIÓN
+  /// ============================================================
+  Future<String?> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      return null; // Éxito
+    } on FirebaseAuthException catch (e) {
+      return _handleAuthErrors(e.code);
+    } catch (e) {
+      return "Error al enviar correo: $e";
+    }
+  }
+
+  /// ============================================================
   /// CERRAR SESIÓN
   /// ============================================================
   Future<void> logout() async {
@@ -81,6 +92,25 @@ class AuthService {
   /// ============================================================
   String? getCurrentUserId() {
     return _auth.currentUser?.uid;
+  }
+
+  /// ============================================================
+  /// OBTENER DATOS DE USUARIO (SNAPSHOT)
+  /// ============================================================
+  Future<DocumentSnapshot<Map<String, dynamic>>?> getUserData() async {
+    try {
+      String? uid = _auth.currentUser?.uid;
+      if (uid == null) return null;
+
+      DocumentSnapshot<Map<String, dynamic>> snapshot = await _db
+          .collection("users")
+          .doc(uid)
+          .get();
+
+      return snapshot;
+    } catch (e) {
+      return null;
+    }
   }
 
   /// ============================================================
@@ -100,24 +130,10 @@ class AuthService {
         return "La contraseña es incorrecta.";
       case "too-many-requests":
         return "Demasiados intentos. Intenta más tarde.";
+      case "auth/user-not-found": // Código específico a veces retornado
+        return "No encontramos una cuenta con este correo.";
       default:
         return "Error: $code";
-    }
-  }
-
-  Future<DocumentSnapshot<Map<String, dynamic>>?> getUserData() async {
-    try {
-      String? uid = _auth.currentUser?.uid;
-      if (uid == null) return null;
-
-      DocumentSnapshot<Map<String, dynamic>> snapshot = await _db
-          .collection("users")
-          .doc(uid)
-          .get();
-
-      return snapshot;
-    } catch (e) {
-      return null;
     }
   }
 }
