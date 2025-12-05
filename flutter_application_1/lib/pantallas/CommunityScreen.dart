@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_application_1/pantallas/CreatePostModal.dart';
+import '../modelos/PostModel.dart';
 
-// --- Definición de Colores (Copiados de tu HomeScreen.dart) ---
+// --- Colores ---
 const Color kPrimaryGreen = Color(0xFF3A7D6E);
 const Color kLightGreenBackground = Color(0xFFF0F5F3);
 const Color kCardBackgroundColor = Colors.white;
@@ -18,73 +22,54 @@ class CommunityScreen extends StatefulWidget {
 }
 
 class _CommunityScreenState extends State<CommunityScreen> {
-  // 0 para "Alimentar", 1 para "Grupos"
   int _selectedTabIndex = 0;
-
-  // --- AÑADIDO: Índice para el BottomNavBar ---
-  // 3 es el índice para "Comunidad"
   int _bottomNavIndex = 3;
 
-  // --- AÑADIDO: Lógica de navegación del BottomNavBar ---
   void _onNavBarTap(int index) {
     setState(() {
       _bottomNavIndex = index;
     });
 
-    // Lógica de navegación (asumiendo que tienes rutas nombradas)
-    // Asegúrate de que las rutas coincidan con tu app.
-    if (index == 0) {
-      // Navegar a Inicio (HomeScreen)
-      Navigator.pushReplacementNamed(
-        context,
-        '/HomeScreen',
-      ); // O la ruta que uses
-    }
-    if (index == 1) {
-      // Navegar a Eventos
-      Navigator.pushReplacementNamed(context, '/EventosScreen');
-    }
-    if (index == 2) {
-      // Navegar a Perfil
-      Navigator.pushReplacementNamed(context, '/ProfileScreen');
-    }
-    if (index == 3) {
-      Navigator.pushReplacementNamed(context, '/CommunityScreen');
-    }
-    if (index == 4) {
-      Navigator.pushReplacementNamed(context, '/TrainingScreen');
-    }
+    if (index == 0) Navigator.pushReplacementNamed(context, '/HomeScreen');
+    if (index == 1) Navigator.pushReplacementNamed(context, '/EventosScreen');
+    if (index == 2) Navigator.pushReplacementNamed(context, '/ProfileScreen');
+    if (index == 3) Navigator.pushReplacementNamed(context, '/CommunityScreen');
+    if (index == 4) Navigator.pushReplacementNamed(context, '/TrainingScreen');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kLightGreenBackground,
-      // Usamos un Stack para que el FAB se superponga al contenido
       body: Stack(
         children: [
-          // Usamos SingleChildScrollView para que todo el contenido (incluido el header) se desplace
           SingleChildScrollView(
             child: Column(
               children: [
                 _buildCommunityHeader(),
-                _buildTabSwitcher(),
-                // Espacio para el contenido del tab
                 _buildTabContent(),
-                const SizedBox(
-                  height: 100,
-                ), // Espacio extra para el FAB y BottomNav
+                const SizedBox(height: 100),
               ],
             ),
           ),
-          // Botón Flotante de "Añadir"
+
+          // FAB CORREGIDO
           Positioned(
-            // --- MODIFICADO: Ajustado para que no choque con el BottomNav ---
-            bottom: 80, // Sube el botón
+            bottom: 80,
             right: 16,
             child: FloatingActionButton(
               onPressed: () {
-                // TODO: Lógica para crear un nuevo post
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  builder: (_) => const CreatePostModal(),
+                );
               },
               backgroundColor: kPrimaryGreen,
               child: const Icon(Icons.add, color: Colors.white, size: 32),
@@ -92,20 +77,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ),
         ],
       ),
-      // --- AÑADIDO: Barra de Navegación Inferior ---
       bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
-  /// Construye el Header verde de la comunidad
+  // HEADER
   Widget _buildCommunityHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        24,
-        60,
-        24,
-        24,
-      ), // Ajustado para el status bar
+      padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
       decoration: const BoxDecoration(
         color: kPrimaryGreen,
         borderRadius: BorderRadius.only(
@@ -116,7 +95,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Fila de Título y Búsqueda
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -130,14 +108,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.search, color: Colors.white, size: 30),
-                onPressed: () {
-                  // TODO: Lógica de búsqueda
-                },
+                onPressed: () {},
               ),
             ],
           ),
           const SizedBox(height: 20),
-          // Banner "¡Cada paso cuenta!"
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -158,34 +133,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  /// Construye el selector de pestañas "Alimentar" / "Grupos"
-  Widget _buildTabSwitcher() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: kCardBackgroundColor,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _buildTabButton("Alimentar", 0),
-          _buildTabButton("Grupos", 1),
-        ],
-      ),
-    );
-  }
-
-  /// Botón individual para el selector de pestañas
+  // BOTONES TABS
   Widget _buildTabButton(String title, int index) {
     bool isActive = _selectedTabIndex == index;
+
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -213,68 +164,67 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  /// Muestra el contenido de la pestaña seleccionada
+  // CONTENIDO
   Widget _buildTabContent() {
-    // Usamos un Column en lugar de ListView.builder porque la
-    // pantalla completa ya es un SingleChildScrollView.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       child: Column(
         children: [
-          // Mostrar contenido de "Alimentar"
-          if (_selectedTabIndex == 0) ...[
-            _buildPostInputCard(),
-            _buildPostCard(
-              initials: 'MG',
-              avatarColor: Colors.teal,
-              name: 'María González',
-              level: 'Corredor Avanzado',
-              time: '2 horas',
-              text:
-                  '¡Completa mi primera media maratón en Loja! 🏃‍♀️. Increíble experiencia corriendo por los hermosos paisajes de nuestra ciudad. ¡Gracias a todos por el apoyo!',
-              likes: 24,
-              comments: 8,
-              hasImage: true,
-            ),
-            _buildPostCard(
-              initials: 'DM',
-              avatarColor: Colors.orange,
-              name: 'Diego Morales',
-              level: 'Corredor Intermedio',
-              time: '4 horas',
-              text:
-                  'Rutina matutina en el Parque Jipiro ✨. Nada mejor que empezar el día con una buena carrera. ¿Quién se apunta mañana a las 6:00 AM?',
-              likes: 15,
-              comments: 12,
-              hasImage: false,
-            ),
-            _buildPostCard(
-              initials: 'CA',
-              avatarColor: kPrimaryGreen,
-              name: 'Ana Castillo',
-              level: 'Principiante',
-              time: '6 horas',
-              text:
-                  'Consejos para principiantes: Empezar poco a poco es la clave 💪. Después de 3 meses corriendo, por fin puedo hacer 5K sin parar. ¡Nunca se rindan!',
-              likes: 31,
-              comments: 18,
-              hasImage: false,
-            ),
-            _buildPostCard(
-              initials: 'CV',
-              avatarColor: Colors.blueGrey,
-              name: 'Carlos Vega',
-              level: 'Maratonista',
-              time: '8 horas',
-              text:
-                  'Entrenamiento de intervalos en la Universidad Nacional de Loja 🏃. 8x400m con 90s de descanso. ¡Preparándome para el próximo maratón!',
-              likes: 19,
-              comments: 6,
-              hasImage: true,
-            ),
-          ],
+          const SizedBox(height: 20),
 
-          // Mostrar contenido de "Grupos"
+          Row(
+            children: [
+              _buildTabButton("Alimentar", 0),
+              const SizedBox(width: 12),
+              _buildTabButton("Grupos", 1),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          if (_selectedTabIndex == 0)
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection("posts")
+                  .orderBy("createdAt", descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Text(
+                    "Aún no hay publicaciones.",
+                    style: TextStyle(color: Colors.grey),
+                  );
+                }
+
+                final docs = snapshot.data!.docs;
+
+                return Column(
+                  children: docs.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final post = PostModel.fromJson(data);
+
+                    return _buildPostCard(
+                      initials: post.userName.isNotEmpty
+                          ? post.userName.substring(0, 1).toUpperCase()
+                          : "?",
+                      avatarColor: Colors.teal,
+                      name: post.userName,
+                      level: post.userLevel,
+                      time: "hace poco",
+                      text: post.description,
+                      likes: post.likesCount ?? 0,
+                      comments: 0, // 🟢 commentsCount corregido
+                      imageBase64: post.imageBase64,
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+
           if (_selectedTabIndex == 1) ...[
             _buildGroupCard(
               icon: Icons.run_circle_outlined,
@@ -294,67 +244,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
               name: 'Trail Runners Jipiro',
               members: '81 miembros',
             ),
-            _buildGroupCard(
-              icon: Icons.flag_outlined,
-              iconColor: Colors.redAccent,
-              name: 'Maratón Team 2026',
-              members: '22 miembros',
-            ),
           ],
         ],
       ),
     );
   }
 
-  /// Tarjeta para "Crear un nuevo post"
-  Widget _buildPostInputCard() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: kCardBackgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: kLightGreenBackground,
-            child: Text(
-              'TÍME', // TODO: Reemplazar con el logo o iniciales del usuario
-              style: TextStyle(
-                color: kPrimaryGreen,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              '¿Qué tal tu entrenamiento hoy?',
-              style: TextStyle(color: kSecondaryTextColor, fontSize: 16),
-            ),
-          ),
-          const SizedBox(width: 16),
-          IconButton(
-            icon: Icon(Icons.camera_alt_outlined, color: kSecondaryTextColor),
-            onPressed: () {
-              // TODO: Lógica para añadir foto
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Tarjeta individual para un post del feed
+  // POST CARD
   Widget _buildPostCard({
     required String initials,
     required Color avatarColor,
@@ -364,7 +260,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     required String text,
     required int likes,
     required int comments,
-    bool hasImage = false,
+    required String? imageBase64,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -383,7 +279,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header del Post
           Row(
             children: [
               CircleAvatar(
@@ -403,15 +298,15 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   children: [
                     Text(
                       name,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: kPrimaryTextColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
                     ),
                     Text(
-                      '$level • $time',
-                      style: TextStyle(
+                      "$level • $time",
+                      style: const TextStyle(
                         color: kSecondaryTextColor,
                         fontSize: 14,
                       ),
@@ -420,78 +315,74 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.more_horiz, color: kSecondaryTextColor),
-                onPressed: () {
-                  // TODO: Lógica para opciones de post
-                },
+                icon: const Icon(Icons.more_horiz, color: kSecondaryTextColor),
+                onPressed: () {},
               ),
             ],
           ),
+
           const SizedBox(height: 16),
-          // Contenido del Post
+
           Text(
             text,
-            style: TextStyle(
+            style: const TextStyle(
               color: kPrimaryTextColor,
               fontSize: 16,
               height: 1.4,
             ),
           ),
-          // Imagen (si existe)
-          if (hasImage)
+
+          if (imageBase64 != null && imageBase64.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 16.0),
+              padding: const EdgeInsets.only(top: 16),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                // TODO: Reemplazar este placeholder con tu Image.asset o Image.network
-                child: Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    image: DecorationImage(
-                      // Estoy usando un placeholder de red, reemplaza con tu imagen
-                      image: NetworkImage(
-                        'https://picsum.photos/seed/${name.hashCode}/600/400',
-                      ),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                child: Image.memory(
+                  base64Decode(imageBase64),
+                  height: 220,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
+
           const SizedBox(height: 16),
-          // Footer (Likes, Comentarios, Compartir)
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Icon(Icons.favorite, color: Colors.red, size: 22),
+                  const Icon(Icons.favorite, color: Colors.red, size: 22),
                   const SizedBox(width: 6),
                   Text(
-                    '$likes',
-                    style: TextStyle(
+                    "$likes",
+                    style: const TextStyle(
                       color: kSecondaryTextColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(width: 24),
-                  Icon(
+                  const Icon(
                     Icons.chat_bubble_outline,
                     color: kSecondaryTextColor,
                     size: 22,
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '$comments',
-                    style: TextStyle(
+                    "$comments",
+                    style: const TextStyle(
                       color: kSecondaryTextColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
-              Icon(Icons.share_outlined, color: kSecondaryTextColor, size: 22),
+              const Icon(
+                Icons.share_outlined,
+                color: kSecondaryTextColor,
+                size: 22,
+              ),
             ],
           ),
         ],
@@ -499,9 +390,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  /// --- Pestaña de Grupos (Generada) ---
-
-  /// Tarjeta individual para un Grupo
+  // TARJETA DE GRUPO
   Widget _buildGroupCard({
     required IconData icon,
     required Color iconColor,
@@ -534,7 +423,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         ),
         title: Text(
           name,
-          style: TextStyle(
+          style: const TextStyle(
             color: kPrimaryTextColor,
             fontWeight: FontWeight.bold,
             fontSize: 16,
@@ -542,15 +431,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
         ),
         subtitle: Text(
           members,
-          style: TextStyle(color: kSecondaryTextColor, fontSize: 14),
+          style: const TextStyle(color: kSecondaryTextColor, fontSize: 14),
         ),
         trailing: OutlinedButton(
-          onPressed: () {
-            // TODO: Lógica para unirse al grupo
-          },
+          onPressed: () {},
           style: OutlinedButton.styleFrom(
             foregroundColor: kPrimaryGreen,
-            side: BorderSide(color: kPrimaryGreen, width: 1.5),
+            side: const BorderSide(color: kPrimaryGreen, width: 1.5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30),
             ),
@@ -561,12 +448,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  /// Barra de Navegación Inferior
+  // NAV BAR
   Widget _buildBottomNavBar() {
     return BottomNavigationBar(
       currentIndex: _bottomNavIndex,
       onTap: _onNavBarTap,
-      type: BottomNavigationBarType.fixed, // Muestra todos los labels
+      type: BottomNavigationBarType.fixed,
       backgroundColor: kCardBackgroundColor,
       selectedItemColor: kPrimaryGreen,
       unselectedItemColor: kSecondaryTextColor,
@@ -574,42 +461,29 @@ class _CommunityScreenState extends State<CommunityScreen> {
       showUnselectedLabels: true,
       selectedFontSize: 12,
       unselectedFontSize: 12,
-      items: [
-        const BottomNavigationBarItem(
+      items: const [
+        BottomNavigationBarItem(
           icon: Icon(Icons.home_outlined),
           activeIcon: Icon(Icons.home),
           label: 'Inicio',
         ),
-        const BottomNavigationBarItem(
+        BottomNavigationBarItem(
           icon: Icon(Icons.calendar_today_outlined),
           activeIcon: Icon(Icons.calendar_today),
           label: 'Eventos',
         ),
-        // Ítem de Perfil (Central y estilizado)
         BottomNavigationBarItem(
-          icon: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              // El círculo verde solo aparece cuando está activo
-              color: _bottomNavIndex == 2
-                  ? kPrimaryGreen.withOpacity(0.1)
-                  : Colors.transparent,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.person_outline,
-              color: _bottomNavIndex == 2 ? kPrimaryGreen : kSecondaryTextColor,
-            ),
-          ),
+          icon: Icon(Icons.person_outline),
+          activeIcon: Icon(Icons.person),
           label: 'Perfil',
         ),
-        const BottomNavigationBarItem(
+        BottomNavigationBarItem(
           icon: Icon(Icons.people_outline),
           activeIcon: Icon(Icons.people),
           label: 'Comunidad',
         ),
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.play_arrow), // Asumiendo que esta es la 5ta pestaña
+        BottomNavigationBarItem(
+          icon: Icon(Icons.play_arrow),
           activeIcon: Icon(Icons.play_arrow_outlined),
           label: 'Entrenar',
         ),
