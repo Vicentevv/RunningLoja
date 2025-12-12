@@ -116,11 +116,17 @@ class UserModel {
     final data = doc.data() as Map<String, dynamic>;
 
     return UserModel(
-      uid: data["uid"],
-      fullName: data["fullName"],
-      email: data["email"],
+      // ⬇️ CORRECCIÓN: Usamos ?? doc.id para UID, que siempre existe
+      uid: data["uid"] ?? doc.id,
+      // ⬇️ CORRECCIÓN: Agregamos ?? "" a fullName
+      fullName: data["fullName"] ?? "",
+      // ⬇️ CORRECCIÓN: Agregamos ?? "" a email
+      email: data["email"] ?? "",
       avatarBase64: data["avatarBase64"] ?? "",
-      createdAt: DateTime.parse(data["createdAt"]),
+      // Versión Segura para createdAt:
+      createdAt: data["createdAt"] != null
+          ? DateTime.parse(data["createdAt"])
+          : DateTime.now(), // Fallback: usa la fecha y hora actual
       totalDistance: (data["totalDistance"] as num).toDouble(),
       totalRuns: data["totalRuns"] ?? 0,
       averagePace: data["averagePace"] ?? "",
@@ -135,9 +141,11 @@ class UserModel {
 
       // Nuevos campos
       phone: data["phone"] ?? "",
-      birthDate: data["birthDate"] != null
+      birthDate:
+          (data["birthDate"] is String &&
+              (data["birthDate"] as String).isNotEmpty)
           ? DateTime.parse(data["birthDate"])
-          : DateTime(2000, 1, 1),
+          : DateTime(2000, 1, 1), // Fallback seguro
       gender: data["gender"] ?? "",
       category: data["category"] ?? "",
       experience: data["experience"] ?? "",

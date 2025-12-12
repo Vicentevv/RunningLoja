@@ -117,4 +117,27 @@ class FirestoreService {
       throw Exception("Error al eliminar evento: $e");
     }
   }
+
+  // ============================================================
+  // 🔥 ZONA ADMIN: GESTIÓN DE USUARIOS
+  // ============================================================
+
+  /// Obtener todos los usuarios (para la lista de gestión)
+  Stream<List<UserModel>> getAllUsersStream() {
+    return _db.collection("users").snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) => UserModel.fromDocument(doc)).toList();
+    });
+  }
+
+  /// Eliminar un usuario de la base de datos
+  /// Nota: Esto borra sus datos de Firestore. Para borrar la cuenta de Auth
+  /// completamente se requiere una Cloud Function o hacerlo desde consola,
+  /// pero esto es suficiente para que la app deje de reconocerlo.
+  Future<void> deleteUserDocument(String uid) async {
+    try {
+      await _db.collection("users").doc(uid).delete();
+    } catch (e) {
+      throw Exception("Error al eliminar usuario: $e");
+    }
+  }
 }

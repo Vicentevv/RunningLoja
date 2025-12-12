@@ -10,6 +10,7 @@ import 'package:flutter_application_1/pantallas/LoginScreen.dart';
 import 'package:flutter_application_1/pantallas/ProfileScreen.dart';
 import 'package:flutter_application_1/pantallas/RegisterScreen.dart';
 import 'package:flutter_application_1/pantallas/TrainingScreen.dart';
+import 'package:flutter_application_1/pantallas/AdminUserScreen.dart';
 import 'package:flutter_application_1/pantallas/splash.dart';
 
 void main() async {
@@ -56,6 +57,7 @@ class MyApp extends StatelessWidget {
         '/ProfileScreen': (_) => ProfileScreen(),
         '/CommunityScreen': (_) => CommunityScreen(),
         '/TrainingScreen': (_) => EntrenarScreen(),
+        '/AdminUserScreen': (_) => AdminUsersScreen(),
       },
 
       debugShowCheckedModeBanner: false,

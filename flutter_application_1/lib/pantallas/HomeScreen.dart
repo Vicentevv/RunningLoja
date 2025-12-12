@@ -6,6 +6,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'EventDetailScreen.dart';
 import 'EventosScreen.dart' show EventInfo;
+// IMPORTANTE: Asegúrate de tener este archivo creado o el código dará error
+import 'AdminUserScreen.dart';
 
 // --- Definición de Colores ---
 const Color kPrimaryGreen = Color(0xFF3A7D6E);
@@ -34,6 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
   double _kmSemana = 0;
   int _racha = 0;
   int _eventos = 0;
+
+  // --- NUEVA VARIABLE DE ESTADO ---
+  bool _isAdmin = false;
+
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sessionsSubHome;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSubHome;
 
@@ -113,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    // Escuchamos el doc de usuario para contar eventos inscritos
+    // Escuchamos el doc de usuario para contar eventos y VERIFICAR ROL
     _profileSubHome = FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -123,12 +129,21 @@ class _HomeScreenState extends State<HomeScreen> {
             if (!mounted) return;
             final data = snap.data();
             if (data != null) {
+              // 1. Contar eventos
               int eventsCount = 0;
               if (data['myEventIds'] != null && data['myEventIds'] is List) {
                 eventsCount = (data['myEventIds'] as List).length;
               }
+
+              // 2. Verificar si es Admin (Miramos el campo 'role' definido en tu UserModel)
+              bool adminStatus = false;
+              if (data.containsKey('role') && data['role'] == 'admin') {
+                adminStatus = true;
+              }
+
               setState(() {
                 _eventos = eventsCount;
+                _isAdmin = adminStatus; // Actualizamos el estado
               });
             }
           },
@@ -232,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildHeader(), // YA MUESTRA EL NOMBRE REAL
-                  _buildQuickAccess(),
+                  _buildQuickAccess(), // YA CONTIENE LÓGICA ADMIN
                   _buildUpcomingEvents(),
                   const SizedBox(height: 24),
                 ],
@@ -420,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Sección de "Acceso rápido"
+  /// Sección de "Acceso rápido" - MODIFICADA PARA ADMIN
   Widget _buildQuickAccess() {
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -436,7 +451,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Primera fila con 2 tarjetas
+
+          // --- PRIMERA FILA (Eventos y Comunidad) ---
           Row(
             children: [
               Expanded(
@@ -465,21 +481,54 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          // Segunda fila con tarjeta centrada
-          Center(
-            child: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.51,
-              child: GestureDetector(
-                onTap: () => Navigator.pushNamed(context, '/TrainingScreen'),
-                child: _buildAccessCard(
-                  Icons.fitness_center,
-                  'Entrenar',
-                  'Planes de entrenamiento',
-                  kAccentOrange,
+
+          // --- SEGUNDA FILA (CONDICIONAL ADMIN) ---
+          if (_isAdmin)
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/TrainingScreen'),
+                    child: _buildAccessCard(
+                      Icons.fitness_center,
+                      'Entrenar',
+                      'Planes',
+                      kAccentOrange,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/AdminUserScreen'),
+                    child: _buildAccessCard(
+                      Icons.manage_accounts,
+                      'Gestión',
+                      'Usuarios',
+                      Colors.indigo, // Color distintivo para Admin
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            // SI NO ES ADMIN: Diseño original centrado
+            Center(
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.51,
+                child: GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/TrainingScreen'),
+                  child: _buildAccessCard(
+                    Icons.fitness_center,
+                    'Entrenar',
+                    'Planes de entrenamiento',
+                    kAccentOrange,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -581,7 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Tarjeta individual para un "Evento" - IDÉNTICA A EventosScreen
+  /// Tarjeta individual para un "Evento"
   Widget _buildEventCard(EventInfo evento) {
     return GestureDetector(
       onTap: () {
@@ -628,7 +677,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         );
                       } catch (e) {
-                        // Si falla la decodificación, mostramos placeholder seguro
                         return Container(
                           width: 80,
                           height: 110,
@@ -714,16 +762,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Panel de Notificaciones que se superpone
   Widget _buildNotificationPanel() {
-    // Obtenemos la altura del padding superior (área de la barra de estado)
     final double statusBarHeight = MediaQuery.of(context).padding.top;
     return Positioned(
-      top: statusBarHeight + 10, // Se posiciona debajo de la barra de estado
+      top: statusBarHeight + 10,
       right: 16,
       child: Material(
         elevation: 10,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          width: MediaQuery.of(context).size.width * 0.85, // 85% del ancho
+          width: MediaQuery.of(context).size.width * 0.85,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -830,8 +877,7 @@ class _HomeScreenState extends State<HomeScreen> {
         style: const TextStyle(color: kSecondaryTextColor, fontSize: 10),
       ),
       onTap: () {
-        // Lógica al tocar una notificación
-        _toggleNotifications(); // Cierra el panel
+        _toggleNotifications();
       },
     );
   }
@@ -841,7 +887,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return BottomNavigationBar(
       currentIndex: _selectedIndex,
       onTap: _onNavBarTap,
-      type: BottomNavigationBarType.fixed, // Muestra todos los labels
+      type: BottomNavigationBarType.fixed,
       backgroundColor: kCardBackgroundColor,
       selectedItemColor: kPrimaryGreen,
       unselectedItemColor: kSecondaryTextColor,
@@ -865,7 +911,6 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              // El círculo verde solo aparece cuando está activo
               color: _selectedIndex == 2
                   ? kPrimaryGreen.withOpacity(0.1)
                   : Colors.transparent,
