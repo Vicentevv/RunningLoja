@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_application_1/modelos/EventModel.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({Key? key}) : super(key: key);
@@ -86,14 +88,23 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         selectedCategoria == null ||
         selectedDate == null ||
         selectedTime == null ||
-        imageBase64 == null) {
+        imageBase64 == null ||
+        organizadorController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            "Completa todos los campos obligatorios, incluida la imagen",
+            "Completa todos los campos obligatorios, incluida la imagen y el nombre del organizador",
           ),
         ),
       );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Debes estar autenticado')));
       return;
     }
 
@@ -105,26 +116,31 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       selectedTime!.minute,
     );
 
-    await FirebaseFirestore.instance.collection("eventos").add({
-      "nombre": nameController.text.trim(),
-      "tipo": selectedTipo,
-      "categoria": selectedCategoria,
-      "fecha": date.toIso8601String(),
-      "ubicacion": locationController.text.trim(),
-      "descripcion": descriptionController.text.trim(),
-      "requisitos": requisitosController.text.trim(),
-      "incluye": incluyeController.text.trim(),
-      "distancia": distanciaController.text.trim(),
-      "maxParticipantes": maxParticipantesController.text.trim(),
-      "organizador": organizadorController.text.trim(),
-      "email": emailController.text.trim(),
-      "telefono": telefonoController.text.trim(),
+    // Crear instancia de EventModel
+    final event = EventModel(
+      id: '', // Firestore generará el ID
+      imageUrl: 'assets/default_event.jpg',
+      imagenBase64: imageBase64 ?? '',
+      categoria: selectedCategoria ?? 'Sin categoría',
+      tipo: selectedTipo ?? 'Sin tipo',
+      nombre: nameController.text.trim(),
+      fecha: date.toIso8601String(),
+      ubicacion: locationController.text.trim(),
+      inscritos: 0,
+      organizador: user.uid,
+      organizadorNombre: organizadorController.text.trim(),
+      descripcion: descriptionController.text.trim(),
+      distancia: distanciaController.text.trim(),
+      maxParticipantes: maxParticipantesController.text.trim(),
+      email: emailController.text.trim(),
+      telefono: telefonoController.text.trim(),
+      incluye: incluyeController.text.trim(),
+      requisitos: requisitosController.text.trim(),
+      participantes: [], // Inicializar array vacío de participantes
+    );
 
-      // Imagen Base64
-      "imagenBase64": imageBase64,
-
-      "inscritos": 0,
-    });
+    // Guardar en Firestore
+    await FirebaseFirestore.instance.collection("eventos").add(event.toJson());
 
     Navigator.pop(context);
   }

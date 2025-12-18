@@ -1,12 +1,202 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/pantallas/EventosScreen.dart';
+import 'package:flutter_application_1/modelos/EventModel.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
+import 'dart:async';
 
-class EventDetailScreen extends StatelessWidget {
-  final EventInfo event;
+class EventDetailScreen extends StatefulWidget {
+  final EventModel event;
 
   const EventDetailScreen({Key? key, required this.event}) : super(key: key);
+
+  @override
+  State<EventDetailScreen> createState() => _EventDetailScreenState();
+}
+
+class _EventDetailScreenState extends State<EventDetailScreen> {
+  bool _isInscribed = false;
+  bool _isLoading = false;
+  late EventModel event;
+  late StreamSubscription<DocumentSnapshot> _inscriptionListener;
+
+  @override
+  void initState() {
+    super.initState();
+    event = widget.event;
+    _setupInscriptionListener();
+  }
+
+  @override
+  void dispose() {
+    _inscriptionListener.cancel();
+    super.dispose();
+  }
+
+  /// Escuchar cambios en tiempo real si el usuario está inscrito
+  void _setupInscriptionListener() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() => _isInscribed = false);
+      return;
+    }
+
+    _inscriptionListener = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .listen(
+          (doc) {
+            if (mounted) {
+              final data = doc.data();
+              if (data != null && data['myEventIds'] != null) {
+                final myEventIds = List<String>.from(data['myEventIds']);
+                setState(() {
+                  _isInscribed = myEventIds.contains(event.id);
+                });
+              } else {
+                setState(() => _isInscribed = false);
+              }
+            }
+          },
+          onError: (e) {
+            print('Error listening to inscription: $e');
+          },
+        );
+  }
+
+  /// Inscribirse al evento
+  Future<void> _inscribeEvent() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Debes estar autenticado')));
+      return;
+    }
+
+    // Verificar si el evento ya ha finalizado
+    try {
+      final eventDate = DateTime.parse(event.fecha);
+      if (eventDate.isBefore(DateTime.now())) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Este evento ya ha finalizado')),
+        );
+        return;
+      }
+    } catch (e) {
+      print('Error parsing event date: $e');
+    }
+
+    // Verificar si ya está inscrito
+    if (_isInscribed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ya estás inscrito en este evento')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+
+      // 1. Actualizar documento del usuario - agregar evento a myEventIds
+      final userRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+      batch.update(userRef, {
+        'myEventIds': FieldValue.arrayUnion([event.id]),
+      });
+
+      // 2. Actualizar documento del evento
+      final eventRef = FirebaseFirestore.instance
+          .collection('eventos')
+          .doc(event.id);
+      batch.update(eventRef, {
+        'inscritos': FieldValue.increment(1),
+        'participantes': FieldValue.arrayUnion([user.uid]),
+      });
+
+      await batch.commit();
+
+      if (!mounted) return;
+      setState(() => _isInscribed = true);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('¡Te has inscrito al evento exitosamente!'),
+          backgroundColor: Color(0xFF2D8E6F),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Actualizar el contador de inscritos localmente
+      setState(() {
+        event = event.copyWith(inscritos: event.inscritos + 1);
+      });
+    } catch (e) {
+      print('Error inscribing to event: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al inscribirse: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Desuscribirse del evento
+  Future<void> _unsubscribeEvent() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+
+      // 1. Eliminar evento de myEventIds del usuario
+      final userRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+      batch.update(userRef, {
+        'myEventIds': FieldValue.arrayRemove([event.id]),
+      });
+
+      // 2. Actualizar documento del evento
+      final eventRef = FirebaseFirestore.instance
+          .collection('eventos')
+          .doc(event.id);
+      batch.update(eventRef, {
+        'inscritos': FieldValue.increment(-1),
+        'participantes': FieldValue.arrayRemove([user.uid]),
+      });
+
+      await batch.commit();
+
+      if (!mounted) return;
+      setState(() => _isInscribed = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Te has desuscrito del evento'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Actualizar el contador de inscritos localmente
+      setState(() {
+        event = event.copyWith(inscritos: event.inscritos - 1);
+      });
+    } catch (e) {
+      print('Error unsubscribing from event: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al desuscribirse: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   String _formatDate(String isoDate) {
     if (isoDate.isEmpty) return 'Sin fecha';
@@ -375,7 +565,10 @@ class EventDetailScreen extends StatelessWidget {
             children: [
               const Icon(Icons.person, color: Color(0xFF2D8E6F)),
               const SizedBox(width: 12),
-              Text(event.organizador, style: const TextStyle(fontSize: 15)),
+              Text(
+                event.organizadorNombre,
+                style: const TextStyle(fontSize: 15),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -428,6 +621,15 @@ class EventDetailScreen extends StatelessWidget {
     final maxParticipantesInt = int.tryParse(event.maxParticipantes) ?? 0;
     final yaLleno = event.inscritos >= maxParticipantesInt;
 
+    // Verificar si el evento ya ha finalizado
+    bool eventFinished = false;
+    try {
+      final eventDate = DateTime.parse(event.fecha);
+      eventFinished = eventDate.isBefore(DateTime.now());
+    } catch (e) {
+      print('Error parsing event date: $e');
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
@@ -445,42 +647,47 @@ class EventDetailScreen extends StatelessWidget {
         height: 56,
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: yaLleno ? Colors.grey : const Color(0xFF2D8E6F),
+            backgroundColor: eventFinished
+                ? Colors.grey
+                : (_isInscribed ? Colors.orange : const Color(0xFF2D8E6F)),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
             elevation: 3,
           ),
-          onPressed: yaLleno
+          onPressed:
+              (_isLoading ||
+                  (eventFinished && !_isInscribed) ||
+                  (yaLleno && !_isInscribed))
               ? null
-              : () async {
-                  final doc = FirebaseFirestore.instance
-                      .collection('eventos')
-                      .doc(event.id);
-
-                  await doc.update({'inscritos': event.inscritos + 1});
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("¡Te has inscrito al evento!"),
-                      backgroundColor: Color(0xFF2D8E6F),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-
-                  Navigator.pop(context);
+              : () {
+                  if (_isInscribed) {
+                    _unsubscribeEvent();
+                  } else {
+                    _inscribeEvent();
+                  }
                 },
-
-          // ⬇️⬇️⬇️ ESTE ES EL CHILD QUE TE FALTABA
-          child: Text(
-            yaLleno ? "Cupo lleno" : "Inscribirme ahora",
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          // ⬆️⬆️⬆️ ESTE ES EL CHILD QUE TE FALTABA
+          child: _isLoading
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    strokeWidth: 2,
+                  ),
+                )
+              : Text(
+                  eventFinished
+                      ? "Evento finalizado"
+                      : (_isInscribed
+                            ? "Desuscribirse"
+                            : (yaLleno ? "Cupo lleno" : "Inscribirme ahora")),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
         ),
       ),
     );

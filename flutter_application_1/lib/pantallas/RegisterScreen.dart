@@ -456,7 +456,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
             child: Row(
               children: [
                 Icon(icon, color: Colors.grey[500]),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Text(
                   _selectedBirthDate == null
                       ? "Seleccionar"
@@ -508,11 +508,11 @@ class _RegistroScreenState extends State<RegistroScreen> {
               isExpanded: true,
               hint: Row(
                 children: [
-                  Icon(icon, color: Colors.grey[500]),
-                  const SizedBox(width: 10),
+                  Icon(icon, color: Colors.grey[500], size: 20),
+                  const SizedBox(width: 2),
                   Text(
                     "Seleccionar",
-                    style: TextStyle(color: Colors.grey[400]),
+                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
                   ),
                 ],
               ),

@@ -172,16 +172,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
         children: [
           const SizedBox(height: 20),
 
-          Row(
-            children: [
-              _buildTabButton("Alimentar", 0),
-              const SizedBox(width: 12),
-              _buildTabButton("Grupos", 1),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
           if (_selectedTabIndex == 0)
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance

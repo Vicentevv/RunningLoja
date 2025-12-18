@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_1/pantallas/CreateEventScreen.dart';
 import 'package:flutter_application_1/pantallas/EventDetailScreen.dart';
+import 'package:flutter_application_1/modelos/EventModel.dart';
 import 'dart:convert';
 
 // --- Colores reutilizados ---
@@ -11,78 +12,6 @@ const Color kLightGreenBackground = Color(0xFFF0F5F3);
 const Color kCardBackgroundColor = Colors.white;
 const Color kPrimaryTextColor = Color(0xFF333333);
 const Color kSecondaryTextColor = Color(0xFF666666);
-
-class EventInfo {
-  final String id;
-  final String imageUrl;
-  final String imagenBase64;
-  final String categoria;
-  final String tipo;
-  final String nombre;
-  final String fecha;
-  final String ubicacion;
-  final int inscritos;
-  final String organizador;
-  final String descripcion;
-  final String distancia;
-  final String maxParticipantes;
-  final String email;
-  final String telefono;
-  final String incluye;
-  final String requisitos;
-
-  EventInfo({
-    required this.id,
-    required this.imageUrl,
-    required this.imagenBase64,
-    required this.categoria,
-    required this.tipo,
-    required this.nombre,
-    required this.fecha,
-    required this.ubicacion,
-    required this.inscritos,
-    required this.organizador,
-    required this.descripcion,
-    required this.distancia,
-    required this.maxParticipantes,
-    required this.email,
-    required this.telefono,
-    required this.incluye,
-    required this.requisitos,
-  });
-
-  factory EventInfo.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-
-    // Manejo seguro de los campos numéricos y de texto
-    int parseInscritos() {
-      final value = data['inscritos'];
-      if (value is int) return value;
-      if (value is String) return int.tryParse(value) ?? 0;
-      return 0;
-    }
-
-    return EventInfo(
-      id: doc.id,
-      imageUrl: data['imageUrl'] as String? ?? 'assets/default_event.jpg',
-      imagenBase64: data['imagenBase64'] as String? ?? '',
-      categoria: data['categoria'] as String? ?? 'Sin categoría',
-      tipo: data['tipo'] as String? ?? 'Sin tipo',
-      nombre: data['nombre'] as String? ?? 'Sin nombre',
-      fecha: data['fecha'] as String? ?? '',
-      ubicacion: data['ubicacion'] as String? ?? 'Sin ubicación',
-      inscritos: parseInscritos(),
-      organizador: data['organizador'] as String? ?? '',
-      descripcion: data['descripcion'] as String? ?? '',
-      distancia: data['distancia'] as String? ?? '0',
-      maxParticipantes: data['maxParticipantes'] as String? ?? '0',
-      email: data['email'] as String? ?? '',
-      telefono: data['telefono'] as String? ?? '',
-      incluye: data['incluye'] as String? ?? '',
-      requisitos: data['requisitos'] as String? ?? '',
-    );
-  }
-}
 
 class EventosScreen extends StatefulWidget {
   const EventosScreen({Key? key}) : super(key: key);
@@ -95,14 +24,15 @@ class _EventosScreenState extends State<EventosScreen> {
   int _selectedToggle = 0;
   int _selectedIndex = 1;
 
-  Stream<List<EventInfo>> _streamEvents() {
+  Stream<List<EventModel>> _streamEvents() {
     return FirebaseFirestore.instance
         .collection('eventos')
-        .orderBy('fecha', descending: true)
+        .orderBy('fecha', descending: false)
         .snapshots()
         .map(
-          (snapshot) =>
-              snapshot.docs.map((doc) => EventInfo.fromFirestore(doc)).toList(),
+          (snapshot) => snapshot.docs
+              .map((doc) => EventModel.fromFirestore(doc))
+              .toList(),
         );
   }
 
@@ -135,7 +65,7 @@ class _EventosScreenState extends State<EventosScreen> {
         children: [
           _buildHeader(),
           Expanded(
-            child: StreamBuilder<List<EventInfo>>(
+            child: StreamBuilder<List<EventModel>>(
               stream: _streamEvents(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -161,9 +91,34 @@ class _EventosScreenState extends State<EventosScreen> {
                 final events = snapshot.data!;
                 final userId = FirebaseAuth.instance.currentUser?.uid;
 
-                final filtered = _selectedToggle == 0
-                    ? events
-                    : events.where((e) => e.organizador == userId).toList();
+                List<EventModel> filtered;
+
+                if (_selectedToggle == 0) {
+                  // Todos los eventos
+                  filtered = events;
+                } else {
+                  // Mis eventos - filtrar por myEventIds
+                  if (userId == null) {
+                    filtered = [];
+                  } else {
+                    // Obtener los eventos a los que el usuario está inscrito
+                    filtered = events
+                        .where((e) => e.participantes.contains(userId))
+                        .toList();
+                  }
+                }
+
+                if (filtered.isEmpty && _selectedToggle == 1) {
+                  return const Center(
+                    child: Text(
+                      "No estás inscrito a ningún evento",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: kSecondaryTextColor,
+                      ),
+                    ),
+                  );
+                }
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(20),
@@ -268,7 +223,7 @@ class _EventosScreenState extends State<EventosScreen> {
     );
   }
 
-  Widget _buildEventCard(EventInfo event) {
+  Widget _buildEventCard(EventModel event) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -307,7 +262,10 @@ class _EventosScreenState extends State<EventosScreen> {
                             color: Colors.grey[300],
                             width: 80,
                             height: 110,
-                            child: const Icon(Icons.image_not_supported, size: 40),
+                            child: const Icon(
+                              Icons.image_not_supported,
+                              size: 40,
+                            ),
                           ),
                         );
                       } catch (e) {

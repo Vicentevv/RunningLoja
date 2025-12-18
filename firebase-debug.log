@@ -1,0 +1,28 @@
+[debug] [2025-12-12T22:03:43.751Z] ----------------------------------------------------------------------
+[debug] [2025-12-12T22:03:43.754Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\MSI katana\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init functions
+[debug] [2025-12-12T22:03:43.755Z] CLI Version:   14.24.2
+[debug] [2025-12-12T22:03:43.755Z] Platform:      win32
+[debug] [2025-12-12T22:03:43.755Z] Node Version:  v24.11.0
+[debug] [2025-12-12T22:03:43.755Z] Time:          Fri Dec 12 2025 17:03:43 GMT-0500 (hora estándar de Colombia)
+[debug] [2025-12-12T22:03:43.755Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-12T22:03:43.758Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\Users\MSI katana\Desktop\UTPL\CICLO 7\PLATAFORMAS MOVILES\RunningLoja
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] 
+[debug] [2025-12-12T22:03:44.534Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2025-12-12T22:03:44.535Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}

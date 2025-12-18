@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'EventDetailScreen.dart';
-import 'EventosScreen.dart' show EventInfo;
+import 'package:flutter_application_1/modelos/EventModel.dart';
 // IMPORTANTE: Asegúrate de tener este archivo creado o el código dará error
 import 'AdminUserScreen.dart';
 
@@ -32,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// ESTE NOMBRE ES EL QUE SE VA A MOSTRAR EN EL HEADER
   String _fullName = "Cargando...";
-  String _profilePic = "";
   double _kmSemana = 0;
   int _racha = 0;
   int _eventos = 0;
@@ -44,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSubHome;
 
   /// EVENTOS PARA LA SECCIÓN
-  List<EventInfo> _proximosEventos = [];
+  List<EventModel> _proximosEventos = [];
   bool _loadingEventos = true;
 
   @override
@@ -67,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .get();
 
       final eventos = snapshot.docs
-          .map((doc) => EventInfo.fromFirestore(doc))
+          .map((doc) => EventModel.fromFirestore(doc))
           .toList();
 
       if (!mounted) return;
@@ -631,7 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Tarjeta individual para un "Evento"
-  Widget _buildEventCard(EventInfo evento) {
+  Widget _buildEventCard(EventModel evento) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
