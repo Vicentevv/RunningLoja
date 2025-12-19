@@ -6,6 +6,9 @@ import 'dart:async';
 import 'dart:math' show sqrt, cos, sin, atan2, pi, Random;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+import 'local_route_manager.dart'; // <--- Importa el archivo que acabamos de crear
+import 'dart:typed_data'; // Necesario para Uint8List
 
 // --- Definición de Colores ---
 const Color kPrimaryGreen = Color(0xFF3A7D6E);
@@ -37,7 +40,10 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
   // --- Para el Mapa y Ubicación ---
   GoogleMapController? _mapController;
   Location _location = Location();
-  LatLng _currentPosition = const LatLng(3.9936, -79.2045); // Posición inicial (Loja)
+  LatLng _currentPosition = const LatLng(
+    3.9936,
+    -79.2045,
+  ); // Posición inicial (Loja)
   bool _isLoadingLocation = true;
   bool _simulateMode = false; // Si true, usar simulación en lugar de GPS
   // StreamSubscription para rastrear cambios de ubicación (para cancelar después)
@@ -49,7 +55,8 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
   double _pace = 0.0; // Ritmo en min/km
   LatLng? _lastPosition; // Última posición registrada para calcular distancia
   Timer? _trainingTimer; // Timer para actualizar estadísticas cada segundo
-  final List<LatLng> _routePoints = []; // Puntos del recorrido para dibujar la ruta
+  final List<LatLng> _routePoints =
+      []; // Puntos del recorrido para dibujar la ruta
   // --- Datos históricos y calculados desde Firestore ---
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sessionsSub;
   List<Map<String, dynamic>> _sessions = [];
@@ -76,90 +83,109 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
         .collection('sessions')
         .orderBy('date', descending: true)
         .snapshots()
-        .listen((qs) {
-      if (!mounted) return;
+        .listen(
+          (qs) {
+            if (!mounted) return;
 
-      final now = DateTime.now();
-      // Semana actual: consideramos lunes como inicio
-      final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+            final now = DateTime.now();
+            // Semana actual: consideramos lunes como inicio
+            final weekStart = DateTime(
+              now.year,
+              now.month,
+              now.day,
+            ).subtract(Duration(days: now.weekday - 1));
 
-      List<Map<String, dynamic>> sessions = [];
-      double weeklyDistance = 0.0;
-      int weeklyTime = 0;
-      Set<String> sessionDateKeys = {};
+            List<Map<String, dynamic>> sessions = [];
+            double weeklyDistance = 0.0;
+            int weeklyTime = 0;
+            Set<String> sessionDateKeys = {};
 
-      for (final doc in qs.docs) {
-        final data = doc.data();
-        if (data['date'] == null) continue;
-        DateTime date;
-        try {
-          final d = data['date'];
-          if (d is Timestamp) {
-            date = d.toDate();
-          } else if (d is DateTime) {
-            date = d;
-          } else {
-            continue;
-          }
-        } catch (_) {
-          continue;
-        }
+            for (final doc in qs.docs) {
+              final data = doc.data();
+              if (data['date'] == null) continue;
+              DateTime date;
+              try {
+                final d = data['date'];
+                if (d is Timestamp) {
+                  date = d.toDate();
+                } else if (d is DateTime) {
+                  date = d;
+                } else {
+                  continue;
+                }
+              } catch (_) {
+                continue;
+              }
 
-        final session = Map<String, dynamic>.from(data);
-        session['date'] = date;
-        session['id'] = doc.id;
-        sessions.add(session);
+              final session = Map<String, dynamic>.from(data);
+              session['date'] = date;
+              session['id'] = doc.id;
+              sessions.add(session);
 
-        // acumular semana actual
-        if (!date.isBefore(weekStart)) {
-          final dist = (session['distance_km'] ?? session['distance'] ?? session['distanceKm'] ?? 0).toDouble();
-          final dur = (session['duration_seconds'] ?? session['duration'] ?? 0);
-          weeklyDistance += dist;
-          weeklyTime += dur is int ? dur : (dur as num).toInt();
-        }
+              // acumular semana actual
+              if (!date.isBefore(weekStart)) {
+                final dist =
+                    (session['distance_km'] ??
+                            session['distance'] ??
+                            session['distanceKm'] ??
+                            0)
+                        .toDouble();
+                final dur =
+                    (session['duration_seconds'] ?? session['duration'] ?? 0);
+                weeklyDistance += dist;
+                weeklyTime += dur is int ? dur : (dur as num).toInt();
+              }
 
-        // registrar día (yyyy-mm-dd)
-        final key = '${date.year.toString().padLeft(4,'0')}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
-        sessionDateKeys.add(key);
-      }
+              // registrar día (yyyy-mm-dd)
+              final key =
+                  '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+              sessionDateKeys.add(key);
+            }
 
-      // calcular racha actual (días consecutivos con sesión, desde hoy hacia atrás)
-      int streak = 0;
-      DateTime cursor = DateTime(now.year, now.month, now.day);
-      while (true) {
-        final key = '${cursor.year.toString().padLeft(4,'0')}-${cursor.month.toString().padLeft(2,'0')}-${cursor.day.toString().padLeft(2,'0')}';
-        if (sessionDateKeys.contains(key)) {
-          streak++;
-          cursor = cursor.subtract(const Duration(days: 1));
-        } else {
-          break;
-        }
-      }
+            // calcular racha actual (días consecutivos con sesión, desde hoy hacia atrás)
+            int streak = 0;
+            DateTime cursor = DateTime(now.year, now.month, now.day);
+            while (true) {
+              final key =
+                  '${cursor.year.toString().padLeft(4, '0')}-${cursor.month.toString().padLeft(2, '0')}-${cursor.day.toString().padLeft(2, '0')}';
+              if (sessionDateKeys.contains(key)) {
+                streak++;
+                cursor = cursor.subtract(const Duration(days: 1));
+              } else {
+                break;
+              }
+            }
 
-      // generar set de DateTime para marcar calendario
-      Set<DateTime> streakDays = {};
-      for (final k in sessionDateKeys) {
-        final parts = k.split('-');
-        final d = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
-        streakDays.add(d);
-      }
+            // generar set de DateTime para marcar calendario
+            Set<DateTime> streakDays = {};
+            for (final k in sessionDateKeys) {
+              final parts = k.split('-');
+              final d = DateTime(
+                int.parse(parts[0]),
+                int.parse(parts[1]),
+                int.parse(parts[2]),
+              );
+              streakDays.add(d);
+            }
 
-      double weeklyPace = 0.0;
-      if (weeklyDistance > 0) {
-        weeklyPace = (weeklyTime / 60.0) / weeklyDistance;
-      }
+            double weeklyPace = 0.0;
+            if (weeklyDistance > 0) {
+              weeklyPace = (weeklyTime / 60.0) / weeklyDistance;
+            }
 
-      setState(() {
-        _sessions = sessions;
-        _weeklyDistance = weeklyDistance;
-        _weeklyTimeSeconds = weeklyTime;
-        _weeklyPace = weeklyPace;
-        _currentStreak = streak;
-        _streakDays = streakDays;
-      });
-    }, onError: (e) {
-      print('Error listening sessions: $e');
-    });
+            setState(() {
+              _sessions = sessions;
+              _weeklyDistance = weeklyDistance;
+              _weeklyTimeSeconds = weeklyTime;
+              _weeklyPace = weeklyPace;
+              _currentStreak = streak;
+              _streakDays = streakDays;
+            });
+          },
+          onError: (e) {
+            print('Error listening sessions: $e');
+          },
+        );
   }
 
   // Solicita permiso y obtiene la ubicación actual
@@ -198,11 +224,12 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
     final locationData = await _location.getLocation();
     if (!mounted) return;
     setState(() {
-      _currentPosition = LatLng(locationData.latitude!, locationData.longitude!);
-      _isLoadingLocation = false;
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLng(_currentPosition),
+      _currentPosition = LatLng(
+        locationData.latitude!,
+        locationData.longitude!,
       );
+      _isLoadingLocation = false;
+      _mapController?.animateCamera(CameraUpdate.newLatLng(_currentPosition));
     });
   }
 
@@ -230,9 +257,25 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
   }
 
   // --- Funciones para Iniciar/Parar ---
+  // --- Funciones para Iniciar/Parar ---
   Future<void> _startTraining() async {
     if (!mounted) return;
-    // Verificar si podemos usar GPS; en caso contrario, activamos simulación
+
+    // 1. NUEVO: Configurar GPS para máxima precisión (Modo Navegación)
+    try {
+      await _location.changeSettings(
+        accuracy: LocationAccuracy.navigation, // Ideal para correr/rutas
+        interval: 1000, // Intentar actualizar cada 1 segundo
+        distanceFilter: 0, // Registrar cualquier movimiento mínimo
+      );
+    } catch (e) {
+      print("Error ajustando precisión del GPS: $e");
+    }
+
+    // 2. NUEVO: Activar Pantalla Completa (Ocultar barras de estado y navegación)
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+    // --- Verificación de Permisos (Tu código original) ---
     bool serviceEnabled = await _location.serviceEnabled();
     PermissionStatus permissionGranted = await _location.hasPermission();
     if (!serviceEnabled) {
@@ -241,7 +284,8 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
     if (permissionGranted == PermissionStatus.denied) {
       permissionGranted = await _location.requestPermission();
     }
-    _simulateMode = !(serviceEnabled && permissionGranted == PermissionStatus.granted);
+    _simulateMode =
+        !(serviceEnabled && permissionGranted == PermissionStatus.granted);
 
     setState(() {
       _isTraining = true;
@@ -258,18 +302,17 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
     _locationSubscription?.cancel();
     _trainingTimer?.cancel();
 
-    // Timer que actualiza las estadísticas cada segundo (también usaremos simulación aquí)
+    // Timer que actualiza las estadísticas cada segundo
     _trainingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!_isTraining || !mounted) return;
       setState(() {
         _elapsedSeconds++;
         if (_simulateMode) {
-          // Simulación simple: asumir un ritmo base (ej. 5:30 -> 330 segundos/km)
+          // Simulación simple
           double basePaceSecPerKm = 330.0;
-          // Añadir una pequeña variación aleatoria para hacerlo más realista
-          double noise = (Random().nextDouble() - 0.5) * 4.0; // +-2s
+          double noise = (Random().nextDouble() - 0.5) * 4.0;
           double currentPaceSecPerKm = basePaceSecPerKm + noise;
-          double distanceIncrement = 1.0 / currentPaceSecPerKm; // km por segundo
+          double distanceIncrement = 1.0 / currentPaceSecPerKm;
           _totalDistance += distanceIncrement;
         }
         // Actualizar ritmo (min/km)
@@ -279,23 +322,34 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
       });
     });
 
-    // Si no estamos en modo simulación, iniciamos el listener de ubicación
+    // IMPORTANTE: Asegúrate de que aquí abajo sigue tu código del listener (_location.onLocationChanged...)
+    // Si no está el modo simulación, escuchamos el GPS real:
     if (!_simulateMode) {
-      _locationSubscription = _location.onLocationChanged.listen((LocationData currentLocation) {
+      _locationSubscription = _location.onLocationChanged.listen((
+        LocationData currentLocation,
+      ) {
         if (!_isTraining || !mounted) return;
 
-        final newPosition = LatLng(currentLocation.latitude!, currentLocation.longitude!);
+        // Filtro opcional: ignorar lecturas con mala precisión (>20m de error)
+        if (currentLocation.accuracy != null && currentLocation.accuracy! > 25)
+          return;
+
+        final newPosition = LatLng(
+          currentLocation.latitude!,
+          currentLocation.longitude!,
+        );
         setState(() {
           _currentPosition = newPosition;
           _routePoints.add(newPosition);
 
-          // Calcular distancia incremental desde la última posición
           if (_lastPosition != null) {
             double distance = _calculateDistance(_lastPosition!, newPosition);
-            _totalDistance += distance;
+            // Filtro anti-ruido: solo sumar si se movió algo razonable
+            if (distance > 0.0005) {
+              _totalDistance += distance;
+            }
           }
           _lastPosition = newPosition;
-
           _mapController?.animateCamera(
             CameraUpdate.newLatLng(_currentPosition),
           );
@@ -304,17 +358,120 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
     }
   }
 
-  void _stopTraining() {
+  Future<void> _stopTraining() async {
     if (!mounted) return;
-    setState(() {
-      _isTraining = false;
-    });
-    // Cancela el listener de ubicación y el timer para evitar memory leak
-    _locationSubscription?.cancel();
-    _trainingTimer?.cancel();
-    // Guardar el entrenamiento en la base de datos (Firestore)
-    if (_elapsedSeconds > 0 && _totalDistance > 0) {
-      _saveSession();
+
+    print("--- INICIANDO PROCESO DE DETENER ---");
+
+    // 1. Mostrar diálogo de "Guardando..."
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: kPrimaryGreen),
+            SizedBox(height: 16),
+            Text(
+              "Guardando ruta...",
+              style: TextStyle(
+                color: Colors.white,
+                decoration: TextDecoration.none,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    Uint8List? imageBytes;
+
+    try {
+      // --- FASE 1: CAPTURA DE IMAGEN (Mientras seguimos en Full Screen) ---
+      // Solo intentamos la foto si tenemos puntos y el mapa está activo
+      if (_mapController != null && _routePoints.isNotEmpty) {
+        print("Intentando ajustar cámara...");
+
+        // A. Ajustar cámara (con try-catch por si los puntos son inválidos)
+        try {
+          // Si solo hay 1 punto, no podemos calcular bounds, hacemos zoom al punto
+          if (_routePoints.length > 1) {
+            final bounds = LocalRouteManager.getBoundsFromPoints(_routePoints);
+            await _mapController!.animateCamera(
+              CameraUpdate.newLatLngBounds(bounds, 50),
+            );
+          } else {
+            await _mapController!.animateCamera(
+              CameraUpdate.newLatLngZoom(_routePoints.first, 17),
+            );
+          }
+        } catch (e) {
+          print("Error ajustando cámara (no crítico): $e");
+        }
+
+        // B. PAUSA CRÍTICA: Dar tiempo al mapa para renderizar los tiles nuevos
+        // Si no esperamos, el snapshot sale gris o crashea la app
+        await Future.delayed(const Duration(milliseconds: 1000));
+
+        // C. Tomar la foto
+        print("Tomando snapshot...");
+        try {
+          imageBytes = await _mapController!.takeSnapshot();
+          print("Snapshot tomado: ${imageBytes != null ? 'OK' : 'NULL'}");
+        } catch (e) {
+          print(
+            "Error al tomar snapshot (La app no crasheará, solo no habrá foto): $e",
+          );
+          imageBytes = null;
+        }
+      }
+
+      // --- FASE 2: GUARDADO LOCAL ---
+      if (imageBytes != null) {
+        await LocalRouteManager.saveRoute(
+          points: _routePoints,
+          imageBytes: imageBytes,
+          distanceKm: _totalDistance,
+          durationSeconds: _elapsedSeconds,
+        );
+      }
+    } catch (e) {
+      print("Error general durante el proceso de guardado: $e");
+    }
+
+    // --- FASE 3: RESTAURAR ESTADO DEL TELEFONO ---
+    // Recién AHORA, que ya terminamos con el mapa, restauramos la UI.
+    // Esto evita el conflicto de redimensionamiento que causaba el crash.
+
+    if (mounted) {
+      // Restaurar Pantalla Normal
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+      // Restaurar GPS
+      try {
+        _location.changeSettings(
+          accuracy: LocationAccuracy.balanced,
+          interval: 10000,
+        );
+      } catch (_) {}
+
+      // Guardar estadísticas globales (Firebase)
+      if (_elapsedSeconds > 0 && _totalDistance > 0) {
+        _saveSession().catchError((e) => print("Error Firebase: $e"));
+      }
+
+      // Cerrar diálogo de carga
+      Navigator.of(context).pop();
+
+      // Finalizar estado de entrenamiento
+      setState(() {
+        _isTraining = false;
+      });
+
+      _locationSubscription?.cancel();
+      _trainingTimer?.cancel();
     }
   }
 
@@ -324,7 +481,9 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
       if (user == null) return;
       final uid = user.uid;
 
-      final userDocRef = FirebaseFirestore.instance.collection('users').doc(uid);
+      final userDocRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid);
       final snapshot = await userDocRef.get();
 
       double existingDistance = 0.0;
@@ -334,9 +493,17 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
       if (snapshot.exists && snapshot.data() != null) {
         final data = snapshot.data() as Map<String, dynamic>;
         // Leer posibles nombres de campo compatibles
-        existingDistance = (data['totalDistance'] ?? data['total_distance'] ?? 0).toDouble();
-        existingTime = (data['total_time_seconds'] ?? data['totalTimeSeconds'] ?? 0).toInt();
-        existingSessions = (data['totalRuns'] ?? data['session_count'] ?? data['sessionCount'] ?? 0).toInt();
+        existingDistance =
+            (data['totalDistance'] ?? data['total_distance'] ?? 0).toDouble();
+        existingTime =
+            (data['total_time_seconds'] ?? data['totalTimeSeconds'] ?? 0)
+                .toInt();
+        existingSessions =
+            (data['totalRuns'] ??
+                    data['session_count'] ??
+                    data['sessionCount'] ??
+                    0)
+                .toInt();
       }
 
       final newTotalDistance = existingDistance + _totalDistance;
@@ -379,7 +546,8 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
     const double earthRadiusKm = 6371;
     double dLat = _degreesToRadians(end.latitude - start.latitude);
     double dLon = _degreesToRadians(end.longitude - start.longitude);
-    double a = sin(dLat / 2) * sin(dLat / 2) +
+    double a =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(_degreesToRadians(start.latitude)) *
             cos(_degreesToRadians(end.latitude)) *
             sin(dLon / 2) *
@@ -430,15 +598,20 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // SI estamos entrenando, retornamos la NUEVA pantalla completa
+    if (_isTraining) {
+      return Scaffold(
+        body:
+            _buildTrainingFullScreen(), // <--- Método nuevo que crearemos abajo
+      );
+    }
+
+    // SI NO estamos entrenando, retornamos tu diseño original
     return Scaffold(
       backgroundColor: kLightGreenBackground,
       body: SingleChildScrollView(
         child: Column(
-          children: [
-            _buildHeader(),
-            _buildTopTabBar(),
-            _buildTabContent(),
-          ],
+          children: [_buildHeader(), _buildTopTabBar(), _buildTabContent()],
         ),
       ),
       bottomNavigationBar: _buildBottomNavBar(),
@@ -471,7 +644,11 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 28),
+                icon: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: Colors.white,
+                  size: 28,
+                ),
                 onPressed: () {
                   // Lógica para abrir la cámara
                 },
@@ -482,9 +659,19 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
           // Fila de Tarjetas de Estadísticas
           Row(
             children: [
-              _buildStatCard(Icons.directions_run, 'Esta semana', _weeklyDistance.toStringAsFixed(1), 'kilómetros'),
+              _buildStatCard(
+                Icons.directions_run,
+                'Esta semana',
+                _weeklyDistance.toStringAsFixed(1),
+                'kilómetros',
+              ),
               const SizedBox(width: 16),
-              _buildStatCard(Icons.local_fire_department, 'Racha actual', _currentStreak.toString(), 'días 🔥'),
+              _buildStatCard(
+                Icons.local_fire_department,
+                'Racha actual',
+                _currentStreak.toString(),
+                'días 🔥',
+              ),
             ],
           ),
         ],
@@ -493,7 +680,12 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
   }
 
   /// Tarjeta individual para las estadísticas en el header
-  Widget _buildStatCard(IconData icon, String title, String value, String? unit) {
+  Widget _buildStatCard(
+    IconData icon,
+    String title,
+    String value,
+    String? unit,
+  ) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -506,7 +698,10 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
           children: [
             Icon(icon, color: Colors.white, size: 28),
             const SizedBox(height: 8),
-            Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            Text(
+              title,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
             const SizedBox(height: 4),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -525,12 +720,15 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
                   Expanded(
                     child: Text(
                       unit,
-                      style: const TextStyle(color: Colors.white70, fontSize: 10),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
               ],
-            )
+            ),
           ],
         ),
       ),
@@ -612,7 +810,10 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(32.0),
-          child: Text('No hay entrenamientos registrados aún.', textAlign: TextAlign.center),
+          child: Text(
+            'No hay entrenamientos registrados aún.',
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     }
@@ -634,9 +835,15 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
             backgroundColor: kPrimaryGreen.withOpacity(0.1),
             child: Icon(Icons.directions_run, color: kPrimaryGreen),
           ),
-          title: Text('${dist.toStringAsFixed(2)} km • ${_formatDurationHMS(dur is int ? dur : (dur as num).toInt())}'),
-          subtitle: Text('${date.day}/${date.month}/${date.year} • Ritmo ${_formatPace((pace is num) ? (pace as num).toDouble() : 0.0)}'),
-          trailing: Text(_formatDurationHMS(dur is int ? dur : (dur as num).toInt())),
+          title: Text(
+            '${dist.toStringAsFixed(2)} km • ${_formatDurationHMS(dur is int ? dur : (dur as num).toInt())}',
+          ),
+          subtitle: Text(
+            '${date.day}/${date.month}/${date.year} • Ritmo ${_formatPace((pace is num) ? (pace as num).toDouble() : 0.0)}',
+          ),
+          trailing: Text(
+            _formatDurationHMS(dur is int ? dur : (dur as num).toInt()),
+          ),
         );
       },
     );
@@ -677,7 +884,9 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
             // Normaliza el día para la comparación
             final normalizedDay = DateTime.utc(day.year, day.month, day.day);
             if (_streakDays.contains(normalizedDay)) {
-              return ['racha']; // Retorna una lista no vacía si es un día de racha
+              return [
+                'racha',
+              ]; // Retorna una lista no vacía si es un día de racha
             }
             return [];
           },
@@ -702,7 +911,7 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
             titleTextStyle: TextStyle(
               color: kPrimaryTextColor,
               fontSize: 18,
-              fontWeight: FontWeight.bold
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
@@ -711,13 +920,7 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
   }
 
   Widget _buildRutasTab() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32.0),
-        child: Text('Aquí podrás explorar y guardar nuevas rutas.',
-            textAlign: TextAlign.center),
-      ),
-    );
+    return const RutasTabContent();
   }
 
   // --- TARJETAS DEL TAB "INICIO" ---
@@ -782,7 +985,10 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -805,9 +1011,7 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
         // --- MAPA ---
         Container(
           height: 250,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: _isLoadingLocation
@@ -822,7 +1026,11 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
           children: [
             _buildLiveStat("RITMO", _formatPace(_pace), "/km"),
             _buildLiveStat("TIEMPO", _formatTime(_elapsedSeconds), ""),
-            _buildLiveStat("DISTANCIA", _totalDistance.toStringAsFixed(2), "km"),
+            _buildLiveStat(
+              "DISTANCIA",
+              _totalDistance.toStringAsFixed(2),
+              "km",
+            ),
           ],
         ),
         const SizedBox(height: 24),
@@ -838,7 +1046,10 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -936,9 +1147,17 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildSummaryItem(Icons.timer_outlined, _formatDurationHMS(_weeklyTimeSeconds), 'Tiempo total'),
+                _buildSummaryItem(
+                  Icons.timer_outlined,
+                  _formatDurationHMS(_weeklyTimeSeconds),
+                  'Tiempo total',
+                ),
                 Container(width: 1, height: 40, color: Colors.grey.shade300),
-                _buildSummaryItem(Icons.speed_outlined, '${_formatPace(_weeklyPace)} /km', 'Ritmo'),
+                _buildSummaryItem(
+                  Icons.speed_outlined,
+                  '${_formatPace(_weeklyPace)} /km',
+                  'Ritmo',
+                ),
               ],
             ),
           ],
@@ -988,9 +1207,17 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildWorkoutItem(Icons.electric_bolt, 'Intervalos 5x1000m', '45 min • Alta intensidad'),
+            _buildWorkoutItem(
+              Icons.electric_bolt,
+              'Intervalos 5x1000m',
+              '45 min • Alta intensidad',
+            ),
             const Divider(height: 24),
-            _buildWorkoutItem(Icons.directions_run, 'Carrera larga', '90 min • Baja intensidad'),
+            _buildWorkoutItem(
+              Icons.directions_run,
+              'Carrera larga',
+              '90 min • Baja intensidad',
+            ),
           ],
         ),
       ),
@@ -1020,15 +1247,21 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
               const SizedBox(height: 4),
               Text(
                 subtitle,
-                style: const TextStyle(color: kSecondaryTextColor, fontSize: 14),
+                style: const TextStyle(
+                  color: kSecondaryTextColor,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
         ),
         TextButton(
           onPressed: () {},
-          child: const Text('Iniciar', style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.bold)),
-        )
+          child: const Text(
+            'Iniciar',
+            style: TextStyle(color: kPrimaryGreen, fontWeight: FontWeight.bold),
+          ),
+        ),
       ],
     );
   }
@@ -1061,12 +1294,16 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
           icon: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: _selectedNavBarIndex == 2 ? kPrimaryGreen.withOpacity(0.1) : Colors.transparent,
+              color: _selectedNavBarIndex == 2
+                  ? kPrimaryGreen.withOpacity(0.1)
+                  : Colors.transparent,
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.person_outline,
-              color: _selectedNavBarIndex == 2 ? kPrimaryGreen : kSecondaryTextColor,
+              color: _selectedNavBarIndex == 2
+                  ? kPrimaryGreen
+                  : kSecondaryTextColor,
             ),
           ),
           label: 'Perfil',
@@ -1080,6 +1317,173 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
           icon: Icon(Icons.play_arrow),
           activeIcon: Icon(Icons.play_arrow_outlined),
           label: 'Entrenar',
+        ),
+      ],
+    );
+  }
+
+  // --- VISTA DE PANTALLA COMPLETA ---
+  Widget _buildTrainingFullScreen() {
+    // --- Lógica de visualización de distancia (Metros vs Km) ---
+    String distanceValue;
+    String distanceUnit;
+
+    if (_totalDistance < 1.0) {
+      // Si es menos de 1 km, convertimos a metros y quitamos decimales
+      // Ejemplo: 0.500 km -> 500 m
+      distanceValue = (_totalDistance * 1000).toStringAsFixed(0);
+      distanceUnit = "m";
+    } else {
+      // Si es 1 km o más, mostramos en km con 2 decimales
+      // Ejemplo: 1.25 km
+      distanceValue = _totalDistance.toStringAsFixed(2);
+      distanceUnit = "km";
+    }
+    // -----------------------------------------------------------
+
+    return Stack(
+      children: [
+        // 1. Mapa ocupando todo el fondo
+        Positioned.fill(
+          child: _isLoadingLocation
+              ? const Center(child: CircularProgressIndicator())
+              : GoogleMap(
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                  },
+                  initialCameraPosition: CameraPosition(
+                    target: _currentPosition,
+                    zoom:
+                        18, // Zoom bien cerca para ver el movimiento en metros
+                  ),
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: false,
+                  zoomControlsEnabled: false,
+                  polylines: {
+                    Polyline(
+                      polylineId: const PolylineId('route'),
+                      points: _routePoints,
+                      color: kPrimaryGreen,
+                      width: 6,
+                    ),
+                  },
+                ),
+        ),
+
+        // 2. Overlay superior (Gradiente)
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            height: 100,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black.withOpacity(0.6), Colors.transparent],
+              ),
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 10, left: 20),
+                child: Row(
+                  children: [
+                    // Indicador de grabación parpadeante (opcional, visual)
+                    Icon(
+                      Icons.fiber_manual_record,
+                      color: Colors.redAccent,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Grabando ruta...",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // 3. Panel de control inferior flotante
+        Positioned(
+          bottom: 30,
+          left: 16,
+          right: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 15,
+                  offset: Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Estadísticas
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildLiveStat("RITMO", _formatPace(_pace), "/km"),
+                    Container(
+                      height: 40,
+                      width: 1,
+                      color: Colors.grey.shade300,
+                    ),
+                    _buildLiveStat("TIEMPO", _formatTime(_elapsedSeconds), ""),
+                    Container(
+                      height: 40,
+                      width: 1,
+                      color: Colors.grey.shade300,
+                    ),
+
+                    // AQUÍ USAMOS LAS VARIABLES CALCULADAS ARRIBA
+                    _buildLiveStat("DISTANCIA", distanceValue, distanceUnit),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Botón de Parar Grande
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _stopTraining();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                    ),
+                    child: const Text(
+                      "TERMINAR",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );

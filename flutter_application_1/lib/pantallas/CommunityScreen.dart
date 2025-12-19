@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_1/pantallas/CreatePostModal.dart';
+import 'package:flutter_application_1/pantallas/PostDetailScreen.dart';
 import '../modelos/PostModel.dart';
 
 // --- Colores ---
@@ -23,7 +25,21 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   int _selectedTabIndex = 0;
+  int _selectedCommentTabIndex = 0;
   int _bottomNavIndex = 3;
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   void _onNavBarTap(int index) {
     setState(() {
@@ -33,7 +49,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
     if (index == 0) Navigator.pushReplacementNamed(context, '/HomeScreen');
     if (index == 1) Navigator.pushReplacementNamed(context, '/EventosScreen');
     if (index == 2) Navigator.pushReplacementNamed(context, '/ProfileScreen');
-    if (index == 3) Navigator.pushReplacementNamed(context, '/CommunityScreen');
+    if (index == 3) {
+      // Hacer scroll a la parte superior
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
     if (index == 4) Navigator.pushReplacementNamed(context, '/TrainingScreen');
   }
 
@@ -44,35 +67,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
       body: Stack(
         children: [
           SingleChildScrollView(
+            controller: _scrollController,
             child: Column(
               children: [
                 _buildCommunityHeader(),
                 _buildTabContent(),
                 const SizedBox(height: 100),
               ],
-            ),
-          ),
-
-          // FAB CORREGIDO
-          Positioned(
-            bottom: 80,
-            right: 16,
-            child: FloatingActionButton(
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  builder: (_) => const CreatePostModal(),
-                );
-              },
-              backgroundColor: kPrimaryGreen,
-              child: const Icon(Icons.add, color: Colors.white, size: 32),
             ),
           ),
         ],
@@ -172,7 +173,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
         children: [
           const SizedBox(height: 20),
 
-          if (_selectedTabIndex == 0)
+          if (_selectedTabIndex == 0) ...[
+            // TARJETA DE CREAR POST
+            _buildCreatePostCard(),
+            const SizedBox(height: 16),
+
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection("posts")
@@ -198,6 +203,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     final post = PostModel.fromJson(data);
 
                     return _buildPostCard(
+                      postId: doc.id,
+                      post: post,
                       initials: post.userName.isNotEmpty
                           ? post.userName.substring(0, 1).toUpperCase()
                           : "?",
@@ -207,13 +214,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       time: "hace poco",
                       text: post.description,
                       likes: post.likesCount ?? 0,
-                      comments: 0, // 🟢 commentsCount corregido
+                      comments: post.commentsCount ?? 0,
                       imageBase64: post.imageBase64,
                     );
                   }).toList(),
                 );
               },
             ),
+          ],
 
           if (_selectedTabIndex == 1) ...[
             _buildGroupCard(
@@ -240,21 +248,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // POST CARD
-  Widget _buildPostCard({
-    required String initials,
-    required Color avatarColor,
-    required String name,
-    required String level,
-    required String time,
-    required String text,
-    required int likes,
-    required int comments,
-    required String? imageBase64,
-  }) {
+  // TARJETA DE CREAR POST
+  Widget _buildCreatePostCard() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
     return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: kCardBackgroundColor,
         borderRadius: BorderRadius.circular(20),
@@ -266,116 +265,213 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: avatarColor.withOpacity(0.2),
-                child: Text(
-                  initials,
-                  style: TextStyle(
-                    color: avatarColor,
-                    fontWeight: FontWeight.bold,
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: Colors.teal.withOpacity(0.2),
+            child: Text(
+              currentUser?.displayName?.isNotEmpty ?? false
+                  ? currentUser!.displayName!.substring(0, 1).toUpperCase()
+                  : "?",
+              style: const TextStyle(
+                color: Colors.teal,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  builder: (_) => const CreatePostModal(),
+                );
+              },
+              child: Text(
+                '¿Qué tal tu entrenamiento hoy?',
+                style: TextStyle(color: kSecondaryTextColor, fontSize: 14),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (_) => const CreatePostModal(),
+              );
+            },
+            child: const Icon(
+              Icons.camera_alt_outlined,
+              color: kSecondaryTextColor,
+              size: 22,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // POST CARD
+  Widget _buildPostCard({
+    required String postId,
+    required PostModel post,
+    required String initials,
+    required Color avatarColor,
+    required String name,
+    required String level,
+    required String time,
+    required String text,
+    required int likes,
+    required int comments,
+    required String? imageBase64,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PostDetailScreen(postId: postId, post: post),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: kCardBackgroundColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: Colors.grey.withOpacity(0.3),
+                  backgroundImage: post.userPhotoBase64.isNotEmpty
+                      ? MemoryImage(base64Decode(post.userPhotoBase64))
+                      : null,
+                  child: post.userPhotoBase64.isEmpty
+                      ? Text(
+                          initials,
+                          style: TextStyle(
+                            color: avatarColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          color: kPrimaryTextColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        "$level • $time",
+                        style: const TextStyle(
+                          color: kSecondaryTextColor,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            Text(
+              text,
+              style: const TextStyle(
+                color: kPrimaryTextColor,
+                fontSize: 16,
+                height: 1.4,
+              ),
+            ),
+
+            if (imageBase64 != null && imageBase64.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.memory(
+                    base64Decode(imageBase64),
+                    height: 220,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+
+            const SizedBox(height: 16),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Row(
                   children: [
+                    const Icon(Icons.favorite, color: Colors.red, size: 22),
+                    const SizedBox(width: 6),
                     Text(
-                      name,
-                      style: const TextStyle(
-                        color: kPrimaryTextColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      "$level • $time",
+                      "$likes",
                       style: const TextStyle(
                         color: kSecondaryTextColor,
-                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    const Icon(
+                      Icons.chat_bubble_outline,
+                      color: kSecondaryTextColor,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      "$comments",
+                      style: const TextStyle(
+                        color: kSecondaryTextColor,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.more_horiz, color: kSecondaryTextColor),
-                onPressed: () {},
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          Text(
-            text,
-            style: const TextStyle(
-              color: kPrimaryTextColor,
-              fontSize: 16,
-              height: 1.4,
+              ],
             ),
-          ),
-
-          if (imageBase64 != null && imageBase64.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.memory(
-                  base64Decode(imageBase64),
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-
-          const SizedBox(height: 16),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.favorite, color: Colors.red, size: 22),
-                  const SizedBox(width: 6),
-                  Text(
-                    "$likes",
-                    style: const TextStyle(
-                      color: kSecondaryTextColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(width: 24),
-                  const Icon(
-                    Icons.chat_bubble_outline,
-                    color: kSecondaryTextColor,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    "$comments",
-                    style: const TextStyle(
-                      color: kSecondaryTextColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              const Icon(
-                Icons.share_outlined,
-                color: kSecondaryTextColor,
-                size: 22,
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

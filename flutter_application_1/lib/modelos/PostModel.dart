@@ -8,9 +8,10 @@ class PostModel {
   final String userLevel;
   final String description;
   final String imageBase64;
+  final String userPhotoBase64;
   final DateTime createdAt;
   final int likesCount;
-  final int commentsCount; // <-- NUEVO
+  final int commentsCount;
 
   PostModel({
     required this.id,
@@ -19,6 +20,7 @@ class PostModel {
     required this.userLevel,
     required this.description,
     required this.imageBase64,
+    required this.userPhotoBase64,
     required this.createdAt,
     required this.likesCount,
     required this.commentsCount,
@@ -32,9 +34,10 @@ class PostModel {
       "userLevel": userLevel,
       "description": description,
       "imageBase64": imageBase64,
+      "userPhotoBase64": userPhotoBase64,
       "createdAt": createdAt.toIso8601String(),
       "likesCount": likesCount,
-      "commentsCount": commentsCount, // <-- NUEVO
+      "commentsCount": commentsCount,
     };
   }
 
@@ -46,6 +49,7 @@ class PostModel {
       userLevel: json['userLevel'] ?? '',
       description: json['description'] ?? '',
       imageBase64: json['imageBase64'] ?? '',
+      userPhotoBase64: json['userPhotoBase64'] ?? '',
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
           : DateTime.now(),

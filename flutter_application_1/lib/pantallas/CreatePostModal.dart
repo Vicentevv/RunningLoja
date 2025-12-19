@@ -53,6 +53,7 @@ class _CreatePostModalState extends State<CreatePostModal> {
       userLevel: user.role,
       description: _textController.text.trim(),
       imageBase64: imageBase64,
+      userPhotoBase64: user.avatarBase64,
       createdAt: DateTime.now(),
       likesCount: 0,
       commentsCount: 0,

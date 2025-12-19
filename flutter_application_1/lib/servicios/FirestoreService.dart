@@ -140,4 +140,223 @@ class FirestoreService {
       throw Exception("Error al eliminar usuario: $e");
     }
   }
+
+  // ============================================================
+  // 💬 COMENTARIOS
+  // ============================================================
+
+  /// Agregar un comentario a un post
+  Future<void> addComment({
+    required String postId,
+    required String userId,
+    required String userName,
+    required String text,
+  }) async {
+    try {
+      final commentId = _db
+          .collection("posts")
+          .doc(postId)
+          .collection("comments")
+          .doc()
+          .id;
+
+      await _db
+          .collection("posts")
+          .doc(postId)
+          .collection("comments")
+          .doc(commentId)
+          .set({
+            "id": commentId,
+            "userId": userId,
+            "userName": userName,
+            "text": text,
+            "createdAt": DateTime.now().toIso8601String(),
+          });
+
+      // Incrementar conteo de comentarios
+      await _db.collection("posts").doc(postId).update({
+        "commentsCount": FieldValue.increment(1),
+      });
+    } catch (e) {
+      throw Exception("Error al agregar comentario: $e");
+    }
+  }
+
+  /// Obtener comentarios de un post
+  Stream<QuerySnapshot> getComments(String postId) {
+    return _db
+        .collection("posts")
+        .doc(postId)
+        .collection("comments")
+        .orderBy("createdAt", descending: true)
+        .snapshots();
+  }
+
+  /// Eliminar un comentario
+  Future<void> deleteComment({
+    required String postId,
+    required String commentId,
+  }) async {
+    try {
+      await _db
+          .collection("posts")
+          .doc(postId)
+          .collection("comments")
+          .doc(commentId)
+          .delete();
+
+      // Decrementar conteo de comentarios
+      await _db.collection("posts").doc(postId).update({
+        "commentsCount": FieldValue.increment(-1),
+      });
+    } catch (e) {
+      throw Exception("Error al eliminar comentario: $e");
+    }
+  }
+
+  // ============================================================
+  // ❤️ LIKES
+  // ============================================================
+
+  /// Agregar un like a un post
+  Future<void> addLike(String postId, String userId) async {
+    try {
+      await _db
+          .collection("posts")
+          .doc(postId)
+          .collection("likes")
+          .doc(userId)
+          .set({
+            "userId": userId,
+            "createdAt": DateTime.now().toIso8601String(),
+          });
+
+      // Incrementar conteo de likes
+      await _db.collection("posts").doc(postId).update({
+        "likesCount": FieldValue.increment(1),
+      });
+    } catch (e) {
+      throw Exception("Error al agregar like: $e");
+    }
+  }
+
+  /// Remover un like de un post
+  Future<void> removeLike(String postId, String userId) async {
+    try {
+      await _db
+          .collection("posts")
+          .doc(postId)
+          .collection("likes")
+          .doc(userId)
+          .delete();
+
+      // Decrementar conteo de likes
+      await _db.collection("posts").doc(postId).update({
+        "likesCount": FieldValue.increment(-1),
+      });
+    } catch (e) {
+      throw Exception("Error al remover like: $e");
+    }
+  }
+
+  /// Obtener los likes de un post
+  Stream<QuerySnapshot> getLikes(String postId) {
+    return _db.collection("posts").doc(postId).collection("likes").snapshots();
+  }
+
+  /// Verificar si el usuario actual le dio like al post
+  Future<bool> hasUserLikedPost(String postId, String userId) async {
+    try {
+      final likeDoc = await _db
+          .collection("posts")
+          .doc(postId)
+          .collection("likes")
+          .doc(userId)
+          .get();
+
+      return likeDoc.exists;
+    } catch (e) {
+      throw Exception("Error al verificar like: $e");
+    }
+  }
+
+  // ============================================================
+  // ❤️ LIKES EN COMENTARIOS
+  // ============================================================
+
+  /// Agregar un like a un comentario
+  Future<void> addCommentLike(
+    String postId,
+    String commentId,
+    String userId,
+  ) async {
+    try {
+      await _db
+          .collection("posts")
+          .doc(postId)
+          .collection("comments")
+          .doc(commentId)
+          .collection("likes")
+          .doc(userId)
+          .set({
+            "userId": userId,
+            "createdAt": DateTime.now().toIso8601String(),
+          });
+    } catch (e) {
+      throw Exception("Error al agregar like al comentario: $e");
+    }
+  }
+
+  /// Remover un like de un comentario
+  Future<void> removeCommentLike(
+    String postId,
+    String commentId,
+    String userId,
+  ) async {
+    try {
+      await _db
+          .collection("posts")
+          .doc(postId)
+          .collection("comments")
+          .doc(commentId)
+          .collection("likes")
+          .doc(userId)
+          .delete();
+    } catch (e) {
+      throw Exception("Error al remover like del comentario: $e");
+    }
+  }
+
+  /// Verificar si el usuario actual le dio like al comentario
+  Future<bool> hasCommentLike(
+    String postId,
+    String commentId,
+    String userId,
+  ) async {
+    try {
+      final likeDoc = await _db
+          .collection("posts")
+          .doc(postId)
+          .collection("comments")
+          .doc(commentId)
+          .collection("likes")
+          .doc(userId)
+          .get();
+
+      return likeDoc.exists;
+    } catch (e) {
+      throw Exception("Error al verificar like del comentario: $e");
+    }
+  }
+
+  /// Obtener los likes de un comentario
+  Stream<QuerySnapshot> getCommentLikes(String postId, String commentId) {
+    return _db
+        .collection("posts")
+        .doc(postId)
+        .collection("comments")
+        .doc(commentId)
+        .collection("likes")
+        .snapshots();
+  }
 }
