@@ -31,6 +31,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   late User? _currentUser;
   bool _isLikedByMe = false;
   int _currentLikesCount = 0;
+  bool _isVerified = false;
+  String _currentUserName = 'Usuario';
 
   @override
   void initState() {
@@ -38,6 +40,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _currentUser = FirebaseAuth.instance.currentUser;
     _currentLikesCount = widget.post.likesCount;
     _checkIfLiked();
+    _loadCurrentUserProfile();
+  }
+
+  Future<void> _loadCurrentUserProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _isVerified = doc.data()?['isVerified'] ?? false;
+          _currentUserName = doc.data()?['fullName'] ?? 'Usuario';
+        });
+      }
+    }
   }
 
   @override
@@ -96,8 +112,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       await _firestoreService.addComment(
         postId: widget.postId,
         userId: _currentUser!.uid,
-        userName: _currentUser!.displayName ?? 'Usuario',
+        userName: _currentUserName, // ⬅️ Usamos nombre real de Firestore
         text: _commentController.text,
+        isVerified: _isVerified, 
       );
 
       _commentController.clear();
@@ -387,14 +404,25 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      comment.userName,
-                      style: const TextStyle(
-                        color: kPrimaryTextColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              comment.userName,
+                              style: const TextStyle(
+                                color: kPrimaryTextColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (comment.isVerified) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.verified, color: Colors.blueAccent, size: 14),
+                          ],
+                        ],
                       ),
-                    ),
                     Text(
                       _formatDateTime(comment.createdAt),
                       style: const TextStyle(

@@ -116,6 +116,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       selectedTime!.minute,
     );
 
+    // Obtener estado de verificación del usuario
+    bool isUserVerified = false;
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (userDoc.exists) {
+        isUserVerified = userDoc.data()?['isVerified'] ?? false;
+      }
+    } catch (e) {
+      print("Error obteniendo verificación: $e");
+    }
+
     // Crear instancia de EventModel
     final event = EventModel(
       id: '', // Firestore generará el ID
@@ -137,6 +151,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       incluye: incluyeController.text.trim(),
       requisitos: requisitosController.text.trim(),
       participantes: [], // Inicializar array vacío de participantes
+      isVerified: isUserVerified, // ⬅️ Guardar estado
     );
 
     // Guardar en Firestore

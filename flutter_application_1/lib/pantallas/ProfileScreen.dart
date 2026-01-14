@@ -451,13 +451,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _user?.fullName ?? 'Usuario',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _user?.fullName ?? 'Usuario',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (_user?.isVerified == true) ...[ // ⬅️ Badge de verificado
+                            const SizedBox(width: 6),
+                            const Icon(Icons.verified, color: Colors.blueAccent, size: 18),
+                          ],
+                        ],
                       ),
-                    ),
                     const SizedBox(height: 4),
                     if ((_user?.email ?? '').isNotEmpty)
                       Text(

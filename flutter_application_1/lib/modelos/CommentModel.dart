@@ -5,12 +5,15 @@ class CommentModel {
   String text;
   DateTime createdAt;
 
+  bool isVerified;
+
   CommentModel({
     required this.id,
     required this.userId,
     required this.userName,
     required this.text,
     required this.createdAt,
+    this.isVerified = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -20,6 +23,7 @@ class CommentModel {
       "userName": userName,
       "text": text,
       "createdAt": createdAt.toIso8601String(),
+      "isVerified": isVerified,
     };
   }
 
@@ -30,6 +34,7 @@ class CommentModel {
       userName: json["userName"],
       text: json["text"],
       createdAt: DateTime.parse(json["createdAt"]),
+      isVerified: json["isVerified"] ?? false,
     );
   }
 }

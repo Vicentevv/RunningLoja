@@ -12,6 +12,7 @@ class PostModel {
   final DateTime createdAt;
   final int likesCount;
   final int commentsCount;
+  final bool isVerified; // ⬅️ Nuevo campo
 
   PostModel({
     required this.id,
@@ -24,6 +25,7 @@ class PostModel {
     required this.createdAt,
     required this.likesCount,
     required this.commentsCount,
+    this.isVerified = false, // ⬅️ Valor por defecto
   });
 
   Map<String, dynamic> toJson() {
@@ -38,6 +40,7 @@ class PostModel {
       "createdAt": createdAt.toIso8601String(),
       "likesCount": likesCount,
       "commentsCount": commentsCount,
+      "isVerified": isVerified, // ⬅️ Mapeo
     };
   }
 
@@ -59,6 +62,7 @@ class PostModel {
       commentsCount: (json['commentsCount'] ?? 0) is int
           ? (json['commentsCount'] ?? 0)
           : int.tryParse((json['commentsCount'] ?? '0').toString()) ?? 0,
+      isVerified: json['isVerified'] ?? false, // ⬅️ Mapeo
     );
   }
 

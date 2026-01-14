@@ -20,6 +20,7 @@ class EventModel {
   final String incluye;
   final String requisitos;
   final List<String> participantes;
+  final bool isVerified; // ⬅️ Nuevo campo
 
   EventModel({
     required this.id,
@@ -41,6 +42,7 @@ class EventModel {
     required this.incluye,
     required this.requisitos,
     this.participantes = const [],
+    this.isVerified = false, // ⬅️ Valor por defecto
   });
 
   factory EventModel.fromFirestore(DocumentSnapshot doc) {
@@ -76,6 +78,7 @@ class EventModel {
       participantes: data['participantes'] is List
           ? List<String>.from(data['participantes'])
           : [],
+      isVerified: data['isVerified'] ?? false, // ⬅️ Mapeo
     );
   }
 
@@ -100,6 +103,7 @@ class EventModel {
       'incluye': incluye,
       'requisitos': requisitos,
       'participantes': participantes,
+      'isVerified': isVerified, // ⬅️ Mapeo
     };
   }
 
@@ -133,6 +137,7 @@ class EventModel {
       participantes: json['participantes'] is List
           ? List<String>.from(json['participantes'])
           : [],
+      isVerified: json['isVerified'] ?? false, // ⬅️ Mapeo
     );
   }
 
@@ -156,6 +161,7 @@ class EventModel {
     String? incluye,
     String? requisitos,
     List<String>? participantes,
+    bool? isVerified, // ⬅️ Nuevo parámetro
   }) {
     return EventModel(
       id: id ?? this.id,
@@ -177,6 +183,7 @@ class EventModel {
       incluye: incluye ?? this.incluye,
       requisitos: requisitos ?? this.requisitos,
       participantes: participantes ?? this.participantes,
+      isVerified: isVerified ?? this.isVerified, // ⬅️ Copia
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_1/pantallas/CreatePostModal.dart';
 import 'package:flutter_application_1/pantallas/PostDetailScreen.dart';
+import '../servicios/FirestoreService.dart';
 import '../modelos/PostModel.dart';
 
 // --- Colores ---
@@ -33,6 +34,24 @@ class _CommunityScreenState extends State<CommunityScreen> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    _loadCurrentUserProfile();
+  }
+
+  String? _currentUserAvatarBase64;
+  bool _isCurrentUserVerified = false;
+
+  Future<void> _loadCurrentUserProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        setState(() {
+          _currentUserAvatarBase64 = data?['photoBase64'];
+          _isCurrentUserVerified = data?['isVerified'] ?? false;
+        });
+      }
+    }
   }
 
   @override
@@ -216,6 +235,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       likes: post.likesCount ?? 0,
                       comments: post.commentsCount ?? 0,
                       imageBase64: post.imageBase64,
+                      isVerified: post.isVerified, // ⬅️ Nuevo
                     );
                   }).toList(),
                 );
@@ -270,16 +290,21 @@ class _CommunityScreenState extends State<CommunityScreen> {
           CircleAvatar(
             radius: 18,
             backgroundColor: Colors.teal.withOpacity(0.2),
-            child: Text(
-              currentUser?.displayName?.isNotEmpty ?? false
-                  ? currentUser!.displayName!.substring(0, 1).toUpperCase()
-                  : "?",
-              style: const TextStyle(
-                color: Colors.teal,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
+            backgroundImage: (_currentUserAvatarBase64 != null && _currentUserAvatarBase64!.isNotEmpty)
+                ? MemoryImage(base64Decode(_currentUserAvatarBase64!))
+                : null,
+            child: (_currentUserAvatarBase64 == null || _currentUserAvatarBase64!.isEmpty)
+                ? Text(
+                    currentUser?.displayName?.isNotEmpty ?? false
+                        ? currentUser!.displayName!.substring(0, 1).toUpperCase()
+                        : "?",
+                    style: const TextStyle(
+                      color: Colors.teal,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -340,6 +365,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     required int likes,
     required int comments,
     required String? imageBase64,
+    required bool isVerified, // ⬅️ Recibir estado
   }) {
     return GestureDetector(
       onTap: () {
@@ -390,13 +416,24 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          color: kPrimaryTextColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                color: kPrimaryTextColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isVerified) ...[ // ⬅️ Badge
+                            const SizedBox(width: 4),
+                            const Icon(Icons.verified, color: Colors.blueAccent, size: 16),
+                          ],
+                        ],
                       ),
                       Text(
                         "$level • $time",
@@ -441,32 +478,100 @@ class _CommunityScreenState extends State<CommunityScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.favorite, color: Colors.red, size: 22),
-                    const SizedBox(width: 6),
-                    Text(
-                      "$likes",
-                      style: const TextStyle(
-                        color: kSecondaryTextColor,
-                        fontWeight: FontWeight.w500,
+                // LIKE BUTTON DINÁMICO
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('posts')
+                      .doc(postId)
+                      .collection('likes')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return Row(
+                        children: [
+                          const Icon(Icons.favorite_border,
+                              color: kSecondaryTextColor, size: 22),
+                          const SizedBox(width: 6),
+                          Text(
+                            "$likes",
+                            style: const TextStyle(
+                              color: kSecondaryTextColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    final docs = snapshot.data!.docs;
+                    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+                    final isLiked = docs.any((doc) => doc.id == currentUid);
+                    final currentLikes = docs.length;
+
+                    return GestureDetector(
+                      onTap: () async {
+                        final firestoreService = FirestoreService(); // Instancia local o global
+                        if (currentUid == null) return;
+                        
+                        try {
+                          if (isLiked) {
+                            await firestoreService.removeLike(postId, currentUid);
+                          } else {
+                            await firestoreService.addLike(postId, currentUid);
+                          }
+                        } catch (e) {
+                          print("Error like: $e");
+                        }
+                      },
+                      child: Row(
+                        children: [
+                          Icon(
+                            isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: isLiked ? Colors.red : kSecondaryTextColor,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            "$currentLikes",
+                            style: const TextStyle(
+                              color: kSecondaryTextColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 24),
-                    const Icon(
-                      Icons.chat_bubble_outline,
-                      color: kSecondaryTextColor,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      "$comments",
-                      style: const TextStyle(
-                        color: kSecondaryTextColor,
-                        fontWeight: FontWeight.w500,
+                    );
+                  },
+                ),
+                const SizedBox(width: 24),
+                
+                // COMMENTS
+                GestureDetector(
+                  onTap: () {
+                     Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PostDetailScreen(postId: postId, post: post),
                       ),
-                    ),
-                  ],
+                    );
+                  },
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.chat_bubble_outline,
+                        color: kSecondaryTextColor,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "$comments",
+                        style: const TextStyle(
+                          color: kSecondaryTextColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

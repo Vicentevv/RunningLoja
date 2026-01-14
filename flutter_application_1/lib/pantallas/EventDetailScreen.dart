@@ -569,6 +569,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 event.organizadorNombre,
                 style: const TextStyle(fontSize: 15),
               ),
+              if (event.isVerified) ...[ // ⬅️ Badge
+                const SizedBox(width: 4),
+                const Icon(Icons.verified, color: Colors.blueAccent, size: 16),
+              ],
             ],
           ),
           const SizedBox(height: 8),

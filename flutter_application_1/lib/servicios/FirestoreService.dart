@@ -165,6 +165,7 @@ class FirestoreService {
     required String userId,
     required String userName,
     required String text,
+    bool isVerified = false,
   }) async {
     try {
       final commentId = _db
@@ -185,6 +186,7 @@ class FirestoreService {
             "userName": userName,
             "text": text,
             "createdAt": DateTime.now().toIso8601String(),
+            "isVerified": isVerified,
           });
 
       // Incrementar conteo de comentarios

@@ -23,6 +23,10 @@ class EventosScreen extends StatefulWidget {
 class _EventosScreenState extends State<EventosScreen> {
   int _selectedToggle = 0;
   int _selectedIndex = 1;
+  @override
+  void initState() {
+    super.initState();
+  }
 
   Stream<List<EventModel>> _streamEvents() {
     return FirebaseFirestore.instance
@@ -161,15 +165,36 @@ class _EventosScreenState extends State<EventosScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.add, color: Colors.white, size: 30),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const CreateEventScreen(),
-                    ),
-                  );
+              StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseAuth.instance.currentUser != null
+                    ? FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(FirebaseAuth.instance.currentUser!.uid)
+                        .snapshots()
+                    : const Stream.empty(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || !snapshot.data!.exists) {
+                    return const SizedBox(width: 30);
+                  }
+                  final data = snapshot.data!.data() as Map<String, dynamic>;
+                  // Explicit check for boolean true to avoid any type coercion issues
+                  final bool isVerified = data['isVerified'] == true;
+
+                  if (isVerified) {
+                    return IconButton(
+                      icon: const Icon(Icons.add, color: Colors.white, size: 30),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const CreateEventScreen(),
+                          ),
+                        );
+                      },
+                    );
+                  } else {
+                    return const SizedBox(width: 30);
+                  }
                 },
               ),
             ],

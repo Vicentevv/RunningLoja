@@ -35,34 +35,58 @@ class _CreatePostModalState extends State<CreatePostModal> {
     final userAuth = FirebaseAuth.instance.currentUser;
     if (userAuth == null) return;
 
-    // --- Cargar info completa del usuario desde Firestore
-    final userDoc = await FirebaseFirestore.instance
-        .collection("users")
-        .doc(userAuth.uid)
-        .get();
+    try {
+      // --- Cargar info completa del usuario desde Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection("users")
+          .doc(userAuth.uid)
+          .get();
 
-    final user = UserModel.fromDocument(userDoc);
+      if (!userDoc.exists) {
+        throw Exception("Usuario no encontrado en base de datos");
+      }
 
-    // --- Crear documento
-    final newDoc = FirebaseFirestore.instance.collection("posts").doc();
+      final user = UserModel.fromDocument(userDoc);
 
-    final post = PostModel(
-      id: newDoc.id,
-      userId: user.uid,
-      userName: user.fullName,
-      userLevel: user.role,
-      description: _textController.text.trim(),
-      imageBase64: imageBase64,
-      userPhotoBase64: user.avatarBase64,
-      createdAt: DateTime.now(),
-      likesCount: 0,
-      commentsCount: 0,
-    );
+      // --- Crear documento
+      final newDoc = FirebaseFirestore.instance.collection("posts").doc();
 
-    // --- Guardar en Firestore
-    await newDoc.set(post.toJson());
+      final post = PostModel(
+        id: newDoc.id,
+        userId: user.uid,
+        userName: user.fullName,
+        userLevel: user.role,
+        description: _textController.text.trim(),
+        imageBase64: imageBase64,
+        userPhotoBase64: user.avatarBase64,
+        createdAt: DateTime.now(),
+        likesCount: 0,
+        commentsCount: 0,
+        isVerified: user.isVerified,
+      );
 
-    Navigator.pop(context);
+      // --- Guardar en Firestore
+      await newDoc.set(post.toJson());
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Publicación creada con éxito"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error al crear publicación: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override

@@ -38,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- NUEVA VARIABLE DE ESTADO ---
   bool _isAdmin = false;
+  bool _isVerified = false;
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sessionsSubHome;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSubHome;
@@ -140,9 +141,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 adminStatus = true;
               }
 
+              // 3. Verificar si es Verificado
+              bool verifiedStatus = false;
+              if (data.containsKey('isVerified') && data['isVerified'] == true) {
+                verifiedStatus = true;
+              }
+
               setState(() {
                 _eventos = eventsCount;
                 _isAdmin = adminStatus; // Actualizamos el estado
+                _isVerified = verifiedStatus;
               });
             }
           },
@@ -289,13 +297,33 @@ class _HomeScreenState extends State<HomeScreen> {
                     '¡Hola!',
                     style: TextStyle(color: Colors.white70, fontSize: 16),
                   ),
-                  Text(
-                    _fullName, // ← NOMBRE REAL
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        _fullName, // ← NOMBRE REAL
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (_isVerified) ...[
+                        const SizedBox(width: 8),
+                         // Fondo blanco circular para que resalte el azul
+                        Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          padding: const EdgeInsets.all(2), // Borde blanco
+                          child: const Icon(
+                            Icons.verified,
+                            color: Colors.blueAccent, 
+                            size: 20
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),

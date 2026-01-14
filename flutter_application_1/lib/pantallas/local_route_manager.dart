@@ -49,7 +49,7 @@ class LocalRouteManager {
   // --- 2. Lógica de Guardado: Escribir en Disco ---
   static Future<void> saveRoute({
     required List<LatLng> points,
-    required Uint8List imageBytes,
+    Uint8List? imageBytes, // <--- Opcional ahora
     required double distanceKm,
     required int durationSeconds,
   }) async {
@@ -64,9 +64,13 @@ class LocalRouteManager {
       final directory = await getApplicationDocumentsDirectory();
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
 
-      // A. Guardar Imagen PNG
-      final File imageFile = File('${directory.path}/route_$timestamp.png');
-      await imageFile.writeAsBytes(imageBytes);
+      // A. Guardar Imagen PNG (Solo si existe)
+      String? imagePath;
+      if (imageBytes != null) {
+        final File imageFile = File('${directory.path}/route_$timestamp.png');
+        await imageFile.writeAsBytes(imageBytes);
+        imagePath = imageFile.path;
+      }
 
       // B. Guardar Datos JSON
       List<Map<String, double>> pointsJson = points
@@ -78,7 +82,7 @@ class LocalRouteManager {
         'date': DateTime.now().toIso8601String(),
         'distance': distanceKm,
         'time': durationSeconds,
-        'imagePath': imageFile.path,
+        'imagePath': imagePath ?? '', // Cadena vacía si no hay imagen
         'points': pointsJson,
       };
 
