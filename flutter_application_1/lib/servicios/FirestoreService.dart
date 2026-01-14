@@ -122,10 +122,24 @@ class FirestoreService {
   // 🔥 ZONA ADMIN: GESTIÓN DE USUARIOS
   // ============================================================
 
-  /// Obtener todos los usuarios (para la lista de gestión)
+  /// 🔥 NUEVO: Cambiar el estado de verificación de un usuario
+  Future<void> updateVerificationStatus(String uid, bool status) async {
+    try {
+      await _db.collection("users").doc(uid).update({"isVerified": status});
+    } catch (e) {
+      throw Exception("Error al actualizar verificación: $e");
+    }
+  }
+
+  // Lista de usuarios QUE EXCLUYE ADMINISTRADORES
   Stream<List<UserModel>> getAllUsersStream() {
     return _db.collection("users").snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => UserModel.fromDocument(doc)).toList();
+      return snapshot.docs
+          .map((doc) => UserModel.fromDocument(doc))
+          .where(
+            (user) => user.role != 'admin',
+          ) // FILTRO: Solo devuelve si el rol NO es admin
+          .toList();
     });
   }
 

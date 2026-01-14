@@ -1,9 +1,9 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // NECESARIO para fechas
-import 'package:flutter_application_1/modelos/UserModel.dart';
+import 'package:intl/intl.dart';
+import '../modelos/UserModel.dart';
+import '../servicios/FirestoreService.dart'; // IMPORTANTE: Importar el servicio
 
 class RegistroScreen extends StatefulWidget {
   const RegistroScreen({Key? key}) : super(key: key);
@@ -13,16 +13,17 @@ class RegistroScreen extends StatefulWidget {
 }
 
 class _RegistroScreenState extends State<RegistroScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+
   // 📌 Controladores de Texto
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _phoneController =
-      TextEditingController(); // NUEVO
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
-  // 📌 Variables de Estado para Selectores (NUEVOS)
+  // 📌 Variables de Estado
   DateTime? _selectedBirthDate;
   String? _selectedGender;
   String? _selectedCategory;
@@ -45,7 +46,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFF4DB6AC), // Color primario
+              primary: Color(0xFF4DB6AC),
               onPrimary: Colors.white,
               onSurface: Colors.black,
             ),
@@ -59,7 +60,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
     }
   }
 
-  // 🔥 Crear usuario en Firebase
+  // 🔥 Registro de Usuario
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -68,55 +69,65 @@ class _RegistroScreenState extends State<RegistroScreen> {
       return;
     }
 
+    if (_selectedBirthDate == null) {
+      _showMessage("Por favor selecciona tu fecha de nacimiento");
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // 👉 1. Crear el usuario con Auth
+      // 1. Crear usuario en Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
           );
 
-      final uid = userCredential.user!.uid;
+      final String uid = userCredential.user!.uid;
 
-      // 2. Guardar en Firestore con todos los campos nuevos
-      final userModel = UserModel(
+      // 2. Crear objeto UserModel con todos los campos necesarios
+      final newUser = UserModel(
         uid: uid,
         fullName: _nameController.text.trim(),
         email: _emailController.text.trim(),
         createdAt: DateTime.now(),
-        totalDistance: 0,
+        totalDistance: 0.0,
         totalRuns: 0,
         averagePace: "0:00",
         streakDays: 0,
         currentGoal: "Sin objetivo",
         myEventIds: [],
-        height: 0,
-        weight: 0,
+        height: 0.0,
+        weight: 0.0,
         role: "runner",
         avatarBase64: '',
-
-        // --- CAMPOS NUEVOS ---
+        isVerified: false, // 👈 IMPORTANTE: Inicia como no verificado
         phone: _phoneController.text.trim(),
-        birthDate: _selectedBirthDate ?? DateTime(2000, 1, 1),
+        birthDate: _selectedBirthDate!,
         gender: _selectedGender ?? "No especificado",
         category: _selectedCategory ?? "Abierta",
         experience: _selectedExperience ?? "Principiante",
       );
 
-      await FirebaseFirestore.instance
-          .collection("users")
-          .doc(uid)
-          .set(userModel.toJson());
+      // 3. Guardar en Firestore usando el Servicio
+      await _firestoreService.createUser(newUser);
 
-      _showMessage("Cuenta creada correctamente");
+      _showMessage("¡Cuenta creada con éxito!");
 
-      Navigator.pushReplacementNamed(context, '/HomeScreen');
+      // Navegar al Home
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/HomeScreen');
+      }
+    } on FirebaseAuthException catch (e) {
+      String error = "Error al registrar";
+      if (e.code == 'email-already-in-use') error = "El correo ya está en uso";
+      if (e.code == 'weak-password') error = "La contraseña es muy débil";
+      _showMessage(error);
     } catch (e) {
-      _showMessage("Error: ${e.toString()}");
+      _showMessage("Error inesperado: ${e.toString()}");
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -137,17 +148,12 @@ class _RegistroScreenState extends State<RegistroScreen> {
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // --- HEADER ---
+                  // --- BOTÓN VOLVER ---
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
+                    child: CircleAvatar(
+                      backgroundColor: Colors.white,
                       child: IconButton(
                         icon: const Icon(
                           Icons.arrow_back,
@@ -157,97 +163,83 @@ class _RegistroScreenState extends State<RegistroScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+
+                  // --- ICONO Y TÍTULO ---
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.9),
+                      color: primaryColor,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
                       Icons.person_add_outlined,
                       color: Colors.white,
-                      size: 48,
+                      size: 40,
                     ),
                   ),
                   const SizedBox(height: 16),
                   const Text(
                     'Únete a RunLoja',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Completa tu perfil para comenzar.',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
-                  // 📌 FORMULARIO
+                  // --- CARD DEL FORMULARIO ---
                   Container(
-                    padding: const EdgeInsets.all(24.0),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          spreadRadius: 5,
-                          blurRadius: 15,
+                          color: Colors.black12,
+                          blurRadius: 10,
                           offset: const Offset(0, 5),
                         ),
                       ],
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildTextField(
                           controller: _nameController,
                           label: 'Nombre completo',
-                          hint: 'Tu nombre completo',
+                          hint: 'Ej: Juan Pérez',
                           icon: Icons.person_outline,
-                          validator: (value) =>
-                              value!.isEmpty ? 'Ingresa un nombre' : null,
+                          validator: (v) => v!.isEmpty ? 'Requerido' : null,
                         ),
-                        const SizedBox(height: 20),
-
+                        const SizedBox(height: 15),
                         _buildTextField(
                           controller: _emailController,
-                          label: 'Correo electrónico',
-                          hint: 'tu@email.com',
-                          icon: Icons.mail_outline,
+                          label: 'Correo',
+                          hint: 'correo@ejemplo.com',
+                          icon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
-                          validator: (value) =>
-                              value!.contains('@') ? null : 'Correo inválido',
+                          validator: (v) =>
+                              !v!.contains('@') ? 'Email inválido' : null,
                         ),
-                        const SizedBox(height: 20),
-
-                        // --- CAMPO CELULAR (NUEVO) ---
+                        const SizedBox(height: 15),
                         _buildTextField(
                           controller: _phoneController,
                           label: 'Celular',
                           hint: '0987654321',
                           icon: Icons.phone_android_outlined,
                           keyboardType: TextInputType.phone,
-                          validator: (value) =>
-                              value!.isEmpty ? 'Ingresa tu celular' : null,
+                          validator: (v) =>
+                              v!.length < 10 ? 'Número incompleto' : null,
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 15),
 
-                        // --- FECHA Y GÉNERO (NUEVO) ---
+                        // Fecha y Género en Fila
                         Row(
                           children: [
                             Expanded(
                               child: _buildDatePicker(
                                 label: 'Nacimiento',
-                                icon: Icons.calendar_today_outlined,
+                                icon: Icons.calendar_today,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: _buildDropdown(
                                 label: 'Género',
@@ -260,26 +252,20 @@ class _RegistroScreenState extends State<RegistroScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 15),
 
-                        // --- CATEGORÍA Y EXPERIENCIA (NUEVO) ---
                         _buildDropdown(
-                          label: 'Categoría',
+                          label: 'Categoría sugerida',
                           value: _selectedCategory,
-                          items: [
-                            "Juvenil (18-25)",
-                            "Abierta (26-35 años)",
-                            "Master (36-45)",
-                            "Veteranos (46+)",
-                          ],
+                          items: ["Juvenil", "Abierta", "Master", "Veteranos"],
                           icon: Icons.category_outlined,
                           onChanged: (val) =>
                               setState(() => _selectedCategory = val),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 15),
 
                         _buildDropdown(
-                          label: 'Nivel de Experiencia',
+                          label: 'Experiencia',
                           value: _selectedExperience,
                           items: [
                             "Principiante",
@@ -287,55 +273,50 @@ class _RegistroScreenState extends State<RegistroScreen> {
                             "Avanzado",
                             "Elite",
                           ],
-                          icon: Icons.star_border,
+                          icon: Icons.speed_outlined,
                           onChanged: (val) =>
                               setState(() => _selectedExperience = val),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 15),
 
                         _buildPasswordField(
                           controller: _passwordController,
                           label: 'Contraseña',
-                          hint: '••••••••',
                           obscureText: _obscurePassword,
-                          onToggleVisibility: () {
-                            setState(
-                              () => _obscurePassword = !_obscurePassword,
-                            );
-                          },
+                          onToggle: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                           validator: (v) =>
                               v!.length < 6 ? 'Mínimo 6 caracteres' : null,
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 15),
 
                         _buildPasswordField(
                           controller: _confirmPasswordController,
-                          label: 'Confirmar',
-                          hint: '••••••••',
+                          label: 'Confirmar Contraseña',
                           obscureText: _obscureConfirmPassword,
-                          onToggleVisibility: () {
-                            setState(
-                              () => _obscureConfirmPassword =
-                                  !_obscureConfirmPassword,
-                            );
-                          },
-                          validator: (v) =>
-                              v!.isEmpty ? 'Confirma tu contraseña' : null,
+                          onToggle: () => setState(
+                            () => _obscureConfirmPassword =
+                                !_obscureConfirmPassword,
+                          ),
+                          validator: (v) => v != _passwordController.text
+                              ? 'No coincide'
+                              : null,
                         ),
-                        const SizedBox(height: 32),
 
-                        // 📌 BOTÓN REGISTRAR
+                        const SizedBox(height: 25),
+
+                        // BOTÓN REGISTRAR
                         SizedBox(
                           width: double.infinity,
+                          height: 55,
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _register,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryColor,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              elevation: 0,
                             ),
                             child: _isLoading
                                 ? const CircularProgressIndicator(
@@ -345,7 +326,6 @@ class _RegistroScreenState extends State<RegistroScreen> {
                                     'Crear cuenta',
                                     style: TextStyle(
                                       fontSize: 18,
-                                      fontWeight: FontWeight.bold,
                                       color: Colors.white,
                                     ),
                                   ),
@@ -354,29 +334,27 @@ class _RegistroScreenState extends State<RegistroScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 25),
 
-                  // ... Resto del login social y footer igual que antes ...
-                  const SizedBox(height: 32),
+                  // Footer
                   RichText(
                     text: TextSpan(
-                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                      text: '¿Ya tienes cuenta? ',
+                      style: const TextStyle(color: Colors.black54),
                       children: [
-                        const TextSpan(text: '¿Ya tienes cuenta? '),
                         TextSpan(
-                          text: 'Inicia sesión aquí',
+                          text: 'Inicia sesión',
                           style: const TextStyle(
                             color: primaryColor,
                             fontWeight: FontWeight.bold,
                           ),
                           recognizer: TapGestureRecognizer()
-                            ..onTap = () {
-                              Navigator.pushNamed(context, '/LoginScreen');
-                            },
+                            ..onTap = () => Navigator.pop(context),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -386,45 +364,73 @@ class _RegistroScreenState extends State<RegistroScreen> {
     );
   }
 
-  // 📌 Helpers
+  // --- WIDGETS AUXILIARES (HELPERS) ---
 
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
     required String hint,
     required IconData icon,
-    String? Function(String?)? validator,
     TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.black54,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 5),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
           validator: validator,
           decoration: InputDecoration(
+            prefixIcon: Icon(icon, size: 20),
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[400]),
-            prefixIcon: Icon(icon, color: Colors.grey[500]),
             filled: true,
             fillColor: Colors.grey[100],
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 16,
-              horizontal: 20,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required bool obscureText,
+    required VoidCallback onToggle,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        const SizedBox(height: 5),
+        TextFormField(
+          controller: controller,
+          obscureText: obscureText,
+          validator: validator,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.lock_outline, size: 20),
+            suffixIcon: IconButton(
+              icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
+              onPressed: onToggle,
+            ),
+            filled: true,
+            fillColor: Colors.grey[100],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
             ),
           ),
         ),
@@ -438,36 +444,25 @@ class _RegistroScreenState extends State<RegistroScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.black54,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
-        const SizedBox(height: 8),
-        GestureDetector(
+        const SizedBox(height: 5),
+        InkWell(
           onTap: _pickDate,
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 12),
             decoration: BoxDecoration(
               color: Colors.grey[100],
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                Icon(icon, color: Colors.grey[500]),
+                Icon(icon, size: 20, color: Colors.grey[600]),
                 const SizedBox(width: 8),
                 Text(
                   _selectedBirthDate == null
-                      ? "Seleccionar"
-                      : DateFormat('dd/MM/yyyy').format(_selectedBirthDate!),
-                  style: TextStyle(
-                    color: _selectedBirthDate == null
-                        ? Colors.grey[400]
-                        : Colors.black87,
-                    fontSize: 14, // Ajuste de fuente para espacio
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                      ? "Elegir"
+                      : DateFormat('dd/MM/yy').format(_selectedBirthDate!),
                 ),
               ],
             ),
@@ -489,13 +484,9 @@ class _RegistroScreenState extends State<RegistroScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.black54,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 5),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
@@ -506,76 +497,16 @@ class _RegistroScreenState extends State<RegistroScreen> {
             child: DropdownButton<String>(
               value: items.contains(value) ? value : null,
               isExpanded: true,
-              hint: Row(
-                children: [
-                  Icon(icon, color: Colors.grey[500], size: 20),
-                  const SizedBox(width: 2),
-                  Text(
-                    "Seleccionar",
-                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                  ),
-                ],
-              ),
-              items: items.map((String item) {
-                return DropdownMenuItem<String>(
-                  value: item,
-                  child: Text(item, style: const TextStyle(fontSize: 14)),
-                );
-              }).toList(),
+              hint: const Text("Elegir", style: TextStyle(fontSize: 14)),
+              items: items
+                  .map(
+                    (e) => DropdownMenuItem(
+                      value: e,
+                      child: Text(e, style: const TextStyle(fontSize: 14)),
+                    ),
+                  )
+                  .toList(),
               onChanged: onChanged,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPasswordField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required bool obscureText,
-    required VoidCallback onToggleVisibility,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.black54,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          validator: validator,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[400]),
-            prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[500]),
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscureText
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: Colors.grey[500],
-              ),
-              onPressed: onToggleVisibility,
-            ),
-            filled: true,
-            fillColor: Colors.grey[100],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 16,
-              horizontal: 20,
             ),
           ),
         ),
