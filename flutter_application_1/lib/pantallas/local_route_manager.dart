@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 // Definimos los colores aquí para que este archivo sea independiente
 // (O podrías importarlos de tu archivo de constantes si tienes uno)
@@ -11,6 +12,19 @@ const Color kPrimaryGreen = Color(0xFF3A7D6E);
 const Color kSecondaryTextColor = Color(0xFF666666);
 
 class LocalRouteManager {
+  // --- 0. Solicitar Permisos de Almacenamiento ---
+  static Future<bool> requestStoragePermission() async {
+    final status = await Permission.storage.request();
+    if (Platform.isAndroid) {
+      // Para Android 12+, también solicitar MANAGE_EXTERNAL_STORAGE si es necesario
+      if (!status.isGranted) {
+        final manageStatus = await Permission.manageExternalStorage.request();
+        return manageStatus.isGranted;
+      }
+    }
+    return status.isGranted;
+  }
+
   // --- 1. Lógica Matemática: Calcular Zoom del Mapa ---
   static LatLngBounds getBoundsFromPoints(List<LatLng> list) {
     if (list.isEmpty) throw Exception("Lista de puntos vacía");
@@ -40,6 +54,13 @@ class LocalRouteManager {
     required int durationSeconds,
   }) async {
     try {
+      // Solicitar permisos antes de guardar
+      bool hasPermission = await requestStoragePermission();
+      if (!hasPermission) {
+        debugPrint("Permiso de almacenamiento denegado");
+        throw Exception("No hay permisos para guardar archivos");
+      }
+
       final directory = await getApplicationDocumentsDirectory();
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
 
@@ -67,6 +88,7 @@ class LocalRouteManager {
       debugPrint("Ruta guardada exitosamente: ${jsonFile.path}");
     } catch (e) {
       debugPrint("Error guardando ruta local: $e");
+      rethrow;
     }
   }
 
@@ -168,7 +190,6 @@ class _RutasTabContentState extends State<RutasTabContent> {
                 true, // Hace que la lista ocupe solo el espacio necesario
             physics:
                 const NeverScrollableScrollPhysics(), // Evita que la lista tenga su propio scroll (conflicto con el scroll principal)
-
             // --- FIN DE LA CORRECCIÓN ---
             padding: const EdgeInsets.all(16),
             itemCount: routes.length,

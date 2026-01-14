@@ -362,6 +362,9 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
     if (!mounted) return;
 
     print("--- INICIANDO PROCESO DE DETENER ---");
+    print(
+      "📊 Datos: distancia=${_totalDistance.toStringAsFixed(2)}km, tiempo=${_elapsedSeconds}s, puntos=${_routePoints.length}",
+    );
 
     // 1. Mostrar diálogo de "Guardando..."
     showDialog(
@@ -429,23 +432,53 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
       }
 
       // --- FASE 2: GUARDADO LOCAL ---
+      print(
+        "📁 Intentando guardar ruta local... (imageBytes=${imageBytes != null})",
+      );
       if (imageBytes != null) {
-        await LocalRouteManager.saveRoute(
-          points: _routePoints,
-          imageBytes: imageBytes,
-          distanceKm: _totalDistance,
-          durationSeconds: _elapsedSeconds,
-        );
+        try {
+          await LocalRouteManager.saveRoute(
+            points: _routePoints,
+            imageBytes: imageBytes,
+            distanceKm: _totalDistance,
+            durationSeconds: _elapsedSeconds,
+          );
+          print("✅ Ruta local guardada exitosamente");
+        } catch (e) {
+          print("❌ Error en guardado local: $e");
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Error al guardar la ruta: $e")),
+            );
+          }
+        }
+      } else {
+        print("⚠️ No hay imagen para guardar (snapshot fue NULL)");
       }
     } catch (e) {
       print("Error general durante el proceso de guardado: $e");
+      // Cerrar el diálogo de error
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+      setState(() {
+        _isTraining = false;
+      });
+      return;
     }
 
     // --- FASE 3: RESTAURAR ESTADO DEL TELEFONO ---
     // Recién AHORA, que ya terminamos con el mapa, restauramos la UI.
     // Esto evita el conflicto de redimensionamiento que causaba el crash.
 
+    print("🔄 FASE 3: Restaurando estado...");
     if (mounted) {
+      print("✓ Widget aún montado, continuando...");
       // Restaurar Pantalla Normal
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
@@ -459,11 +492,33 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
 
       // Guardar estadísticas globales (Firebase)
       if (_elapsedSeconds > 0 && _totalDistance > 0) {
-        _saveSession().catchError((e) => print("Error Firebase: $e"));
+        print("🔥 Guardando sesión en Firebase...");
+        try {
+          // Esperar a que Firebase termine, con timeout de 15 segundos
+          await _saveSession().timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              print(
+                "⚠️ Timeout guardando en Firebase (pero se continuará guardando en background)",
+              );
+            },
+          );
+          print("✅ Sesión guardada en Firebase");
+        } catch (e) {
+          print("❌ Error Firebase: $e");
+        }
+      } else {
+        print("⏭️ Saltando Firebase (datos insuficientes)");
       }
 
       // Cerrar diálogo de carga
-      Navigator.of(context).pop();
+      print("🚪 Intentando cerrar diálogo...");
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+        print("✅ Diálogo cerrado");
+      } else {
+        print("⚠️ No hay diálogo para cerrar");
+      }
 
       // Finalizar estado de entrenamiento
       setState(() {
@@ -472,6 +527,21 @@ class _EntrenarScreenState extends State<EntrenarScreen> {
 
       _locationSubscription?.cancel();
       _trainingTimer?.cancel();
+
+      // Mostrar éxito
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '✅ Ruta guardada: ${_totalDistance.toStringAsFixed(2)} km en ${(_elapsedSeconds ~/ 60)} min',
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      print("🎉 PROCESO COMPLETADO");
+    } else {
+      print("❌ Widget no está montado");
     }
   }
 
