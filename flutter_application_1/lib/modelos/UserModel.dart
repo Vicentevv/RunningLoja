@@ -23,6 +23,7 @@ class UserModel {
 
   // Rol y Permisos
   String role;
+  bool isVerified; // <-- Permiso para crear carreras (Solo editable por admin)
 
   // --- NUEVOS CAMPOS (Solicitados en Editar Perfil) ---
   String phone;
@@ -46,7 +47,7 @@ class UserModel {
     required this.height,
     required this.weight,
     required this.role,
-    // Inicializamos los nuevos en el constructor
+    required this.isVerified,
     required this.phone,
     required this.birthDate,
     required this.gender,
@@ -71,7 +72,7 @@ class UserModel {
       "height": height,
       "weight": weight,
       "role": role,
-      // Nuevos campos
+      "isVerified": isVerified, // Persistimos el estado de verificación
       "phone": phone,
       "birthDate": birthDate.toIso8601String(),
       "gender": gender,
@@ -83,28 +84,32 @@ class UserModel {
   // ------ FROM JSON (Leer mapa simple) ------
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      uid: json["uid"],
-      fullName: json["fullName"],
-      email: json["email"],
+      uid: json["uid"] ?? "",
+      fullName: json["fullName"] ?? "",
+      email: json["email"] ?? "",
       avatarBase64: json["avatarBase64"] ?? "",
-      createdAt: DateTime.parse(json["createdAt"]),
-      totalDistance: (json["totalDistance"] as num).toDouble(),
+      createdAt: json["createdAt"] != null
+          ? DateTime.parse(json["createdAt"])
+          : DateTime.now(),
+      totalDistance: (json["totalDistance"] as num? ?? 0).toDouble(),
       totalRuns: json["totalRuns"] ?? 0,
-      averagePace: json["averagePace"] ?? "",
+      averagePace: json["averagePace"] ?? "0:00",
       streakDays: json["streakDays"] ?? 0,
       currentGoal: json["currentGoal"] ?? "",
       myEventIds: json["myEventIds"] != null
           ? List<String>.from(json["myEventIds"])
           : [],
-      height: (json["height"] as num).toDouble(),
-      weight: (json["weight"] as num).toDouble(),
+      height: (json["height"] as num? ?? 0).toDouble(),
+      weight: (json["weight"] as num? ?? 0).toDouble(),
       role: json["role"] ?? "user",
+      isVerified:
+          json["isVerified"] ??
+          false, // Garantizamos que por defecto sea false si no existe
 
-      // Nuevos campos con manejo de nulos (fallback)
       phone: json["phone"] ?? "",
       birthDate: json["birthDate"] != null
           ? DateTime.parse(json["birthDate"])
-          : DateTime(2000, 1, 1), // Fecha por defecto si no existe
+          : DateTime(2000, 1, 1),
       gender: json["gender"] ?? "",
       category: json["category"] ?? "",
       experience: json["experience"] ?? "",
@@ -113,39 +118,37 @@ class UserModel {
 
   // ------ FROM DOCUMENT (Leer desde Firestore) ------
   factory UserModel.fromDocument(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>? ?? {};
 
     return UserModel(
-      // ⬇️ CORRECCIÓN: Usamos ?? doc.id para UID, que siempre existe
       uid: data["uid"] ?? doc.id,
-      // ⬇️ CORRECCIÓN: Agregamos ?? "" a fullName
       fullName: data["fullName"] ?? "",
-      // ⬇️ CORRECCIÓN: Agregamos ?? "" a email
       email: data["email"] ?? "",
       avatarBase64: data["avatarBase64"] ?? "",
-      // Versión Segura para createdAt:
       createdAt: data["createdAt"] != null
           ? DateTime.parse(data["createdAt"])
-          : DateTime.now(), // Fallback: usa la fecha y hora actual
-      totalDistance: (data["totalDistance"] as num).toDouble(),
+          : DateTime.now(),
+      totalDistance: (data["totalDistance"] as num? ?? 0).toDouble(),
       totalRuns: data["totalRuns"] ?? 0,
-      averagePace: data["averagePace"] ?? "",
+      averagePace: data["averagePace"] ?? "0:00",
       streakDays: data["streakDays"] ?? 0,
       currentGoal: data["currentGoal"] ?? "",
       myEventIds: data["myEventIds"] != null
           ? List<String>.from(data["myEventIds"])
           : [],
-      height: (data["height"] as num).toDouble(),
-      weight: (data["weight"] as num).toDouble(),
+      height: (data["height"] as num? ?? 0).toDouble(),
+      weight: (data["weight"] as num? ?? 0).toDouble(),
       role: data["role"] ?? "user",
+      isVerified:
+          data["isVerified"] ??
+          false, // Seguridad: si el campo no existe en el doc, es false
 
-      // Nuevos campos
       phone: data["phone"] ?? "",
       birthDate:
           (data["birthDate"] is String &&
               (data["birthDate"] as String).isNotEmpty)
           ? DateTime.parse(data["birthDate"])
-          : DateTime(2000, 1, 1), // Fallback seguro
+          : DateTime(2000, 1, 1),
       gender: data["gender"] ?? "",
       category: data["category"] ?? "",
       experience: data["experience"] ?? "",
