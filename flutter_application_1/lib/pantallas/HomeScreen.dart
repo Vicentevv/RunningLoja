@@ -308,20 +308,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       if (_isVerified) ...[
-                        const SizedBox(width: 8),
-                         // Fondo blanco circular para que resalte el azul
-                        Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          padding: const EdgeInsets.all(2), // Borde blanco
-                          child: const Icon(
-                            Icons.verified,
-                            color: Colors.blueAccent, 
-                            size: 20
-                          ),
-                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.verified, color: Colors.blueAccent, size: 18),
                       ],
                     ],
                   ),
@@ -825,19 +813,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 true,
               ),
               _buildNotificationItem(
-                Icons.person_add,
-                kAccentBlue,
-                'Nuevo seguidor',
-                'Maria González comenzó a seguirte',
-                '15 minutos',
+                Icons.local_fire_department,
+                kAccentOrange,
+                'No pierdas tu racha',
+                'Lleva 5 días corriendo, sigue así!',
+                '3 minutos',
                 false,
               ),
               _buildNotificationItem(
                 Icons.emoji_events,
-                kAccentOrange,
+                kAccentBlue,
                 '¡Logro desbloqueado!',
                 'Has puesto 50 km este mes',
-                '1 hora',
+                '22 horas',
                 false,
               ),
               _buildNotificationItem(
@@ -845,7 +833,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Colors.redAccent,
                 'Recordatorio de entrenamiento',
                 'Es hora de tu carrera matutina',
-                '2 horas',
+                '23 horas',
                 false,
               ),
             ],
