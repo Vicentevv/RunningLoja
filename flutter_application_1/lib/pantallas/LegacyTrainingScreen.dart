@@ -619,16 +619,6 @@ class _LegacyTrainingScreenState extends State<LegacyTrainingScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              IconButton(
-                icon: const Icon(
-                  Icons.camera_alt_outlined,
-                  color: Colors.white,
-                  size: 28,
-                ),
-                onPressed: () {
-                  // Lógica para abrir la cámara
-                },
-              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -711,9 +701,9 @@ class _LegacyTrainingScreenState extends State<LegacyTrainingScreen> {
     );
   }
 
-  /// Barra de Toggles (Inicio, Histórico, Calendario, Rutas)
+  /// Barra de Toggles (Inicio, Histórico, Calendario)
   Widget _buildTopTabBar() {
-    final List<String> labels = ['Inicio', 'Histórico', 'Calendario', 'Rutas'];
+    final List<String> labels = ['Inicio', 'Histórico', 'Calendario'];
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
@@ -896,6 +886,103 @@ class _LegacyTrainingScreenState extends State<LegacyTrainingScreen> {
               color: kPrimaryGreen,
               shape: BoxShape.circle,
             ),
+          ),
+          calendarBuilders: CalendarBuilders(
+            defaultBuilder: (context, day, focusedDay) {
+              // Normaliza el día para la comparación (sin UTC, igual que en _streakDays)
+              final normalizedDay = DateTime(day.year, day.month, day.day);
+              final hasTraining = _streakDays.contains(normalizedDay);
+
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(
+                    child: Text(
+                      day.day.toString(),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                  if (hasTraining)
+                    Positioned(
+                      top: 2,
+                      child: Text(
+                        '🔥',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                ],
+              );
+            },
+            todayBuilder: (context, day, focusedDay) {
+              final normalizedDay = DateTime(day.year, day.month, day.day);
+              final hasTraining = _streakDays.contains(normalizedDay);
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: kPrimaryGreen.withOpacity(0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Center(
+                      child: Text(
+                        day.day.toString(),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                    if (hasTraining)
+                      Positioned(
+                        top: 2,
+                        child: Text(
+                          '🔥',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+            selectedBuilder: (context, day, focusedDay) {
+              final normalizedDay = DateTime(day.year, day.month, day.day);
+              final hasTraining = _streakDays.contains(normalizedDay);
+
+              return Container(
+                decoration: const BoxDecoration(
+                  color: kPrimaryGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Center(
+                      child: Text(
+                        day.day.toString(),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.normal,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    if (hasTraining)
+                      Positioned(
+                        top: 2,
+                        child: Text(
+                          '🔥',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
           ),
           headerStyle: const HeaderStyle(
             formatButtonVisible: false,

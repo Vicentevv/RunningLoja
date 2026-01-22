@@ -49,6 +49,9 @@
     <!-- Permisos para Ubicación y GoogleMaps -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Permisos para almacenamiento -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />

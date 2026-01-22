@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import '../../../../modelos/RunModel.dart'; // Importar modelo actualizado
 import 'dart:math' show cos, sqrt, asin;
+import '../logic/kalman_filter.dart'; // Importar Filtro Kalman
 
 enum TrainingState { idle, preparing, running, paused, finished }
 
@@ -93,6 +94,12 @@ class TrainingController extends ChangeNotifier {
   StreamSubscription<LocationData>? _locationSubscription;
   LatLng? _lastRecordedPosition;
 
+  // Filtro de Kalman
+  final _kalmanFilter = KalmanLatLong(
+    25.0,
+  ); // 25 metros como peor precisión aceptable
+  int _lastTimestamp = 0;
+
   // --- Configuración ---
   bool _isDisposed = false;
 
@@ -137,8 +144,12 @@ class TrainingController extends ChangeNotifier {
   Future<void> startTraining() async {
     if (_state == TrainingState.running) return;
 
-    // 1. Configuración High Precision
+    // 1. Configuración High Precision y Segundo Plano
     try {
+      await _location.enableBackgroundMode(
+        enable: true,
+      ); // <--- BACKGROUND MODE
+
       await _location.changeSettings(
         accuracy: LocationAccuracy.navigation, // MÁXIMA PRECISIÓN
         interval: 1000, // Cada 1 segundo
@@ -160,6 +171,14 @@ class TrainingController extends ChangeNotifier {
       try {
         final loc = await _location.getLocation();
         if (loc.latitude != null && loc.longitude != null) {
+          // Inicializar filtro
+          _kalmanFilter.setState(
+            loc.latitude!,
+            loc.longitude!,
+            loc.accuracy ?? 10,
+            _lastTimestamp,
+          );
+
           final pos = LatLng(loc.latitude!, loc.longitude!);
           _pathPoints.add(pos);
           _lastRecordedPosition = pos;
@@ -184,7 +203,10 @@ class TrainingController extends ChangeNotifier {
   void pauseTraining() {
     _state = TrainingState.paused;
     _timer?.cancel();
-    _locationSubscription?.cancel(); // Ahorrar batería en pausa
+    // No cancelamos locationSubscription del todo si queremos mantener el GPS caliente,
+    // pero para horrar batería y evitar puntos locos en pausa, a veces es mejor cancelar.
+    // Sin embargo, enableBackgroundMode sigue activo.
+    _locationSubscription?.cancel();
     notifyListeners();
   }
 
@@ -201,6 +223,7 @@ class TrainingController extends ChangeNotifier {
 
     // Restaurar GPS a modo balanceado
     try {
+      await _location.enableBackgroundMode(enable: false);
       await _location.changeSettings(
         accuracy: LocationAccuracy.balanced,
         interval: 10000,
@@ -214,33 +237,26 @@ class TrainingController extends ChangeNotifier {
     if (_state != TrainingState.running) return;
     if (data.latitude == null || data.longitude == null) return;
 
-    // 1. FILTRO DE PRECISIÓN (Buscamos < 12 metros)
-    // Tu código aceptaba 20m, que es demasiado margen de error en ciudad.
-    if (data.accuracy != null && data.accuracy! > 12) {
-      return;
-    }
-
-    // 2. FILTRO DE VELOCIDAD (Anti-Zigzag)
-    // Si la velocidad es menor a 0.5 m/s (1.8 km/h), el usuario está parado.
-    // El GPS drift suele ocurrir cuando estamos quietos.
-    double speed = data.speed ?? 0.0;
-    if (speed < 0.5) {
+    // Filtrar puntos con mala precisión
+    if (data.accuracy != null && data.accuracy! > 20) {
+      // debugPrint("Punto ignorado por mala precisión: ${data.accuracy}");
       return;
     }
 
     final newPos = LatLng(data.latitude!, data.longitude!);
 
+    // Calcular distancia
     if (_lastRecordedPosition != null) {
       final distIncrement = _calculateDistance(_lastRecordedPosition!, newPos);
 
-      // 3. FILTRO DE DISTANCIA (Umbral de 6 metros)
-      // Cambiamos el 0.002 (2m) por 0.006 (6m).
-      // Esto garantiza que la línea solo avance cuando hay un desplazamiento real.
-      if (distIncrement > 0.006) {
+      // Filtro anti-ruido (mínimo movimiento para contar)
+      if (distIncrement > 0.002) {
+        // > 2 metros
         _distanceKm += distIncrement;
         _pathPoints.add(newPos);
         _lastRecordedPosition = newPos;
 
+        // Actualizar ritmo
         _updatePace();
       }
     } else {
