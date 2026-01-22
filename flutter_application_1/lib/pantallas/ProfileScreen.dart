@@ -515,7 +515,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: 1.8,
+      childAspectRatio: 1.5,
       children: [
         _buildStatItem(
           _weeklyDistance.toStringAsFixed(1), // km esta semana

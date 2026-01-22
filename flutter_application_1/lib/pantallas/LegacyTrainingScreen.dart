@@ -701,9 +701,9 @@ class _LegacyTrainingScreenState extends State<LegacyTrainingScreen> {
     );
   }
 
-  /// Barra de Toggles (Inicio, Histórico, Calendario, Rutas)
+  /// Barra de Toggles (Inicio, Histórico, Calendario)
   Widget _buildTopTabBar() {
-    final List<String> labels = ['Inicio', 'Histórico', 'Calendario', 'Rutas'];
+    final List<String> labels = ['Inicio', 'Histórico', 'Calendario'];
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
