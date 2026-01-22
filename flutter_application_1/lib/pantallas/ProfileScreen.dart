@@ -451,24 +451,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              _user?.fullName ?? 'Usuario',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _user?.fullName ?? 'Usuario',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          if (_user?.isVerified == true) ...[ // ⬅️ Badge de verificado
-                            const SizedBox(width: 6),
-                            const Icon(Icons.verified, color: Colors.blueAccent, size: 18),
-                          ],
+                        ),
+                        if (_user?.isVerified == true) ...[
+                          // ⬅️ Badge de verificado
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.verified,
+                            color: Colors.blueAccent,
+                            size: 18,
+                          ),
                         ],
-                      ),
+                      ],
+                    ),
                     const SizedBox(height: 4),
                     if ((_user?.email ?? '').isNotEmpty)
                       Text(
@@ -515,28 +522,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: 1.5,
+      // Cambiado de 1.2 a 1.0 para dar más espacio vertical y evitar el overflow
+      childAspectRatio: 1.0,
       children: [
         _buildStatItem(
-          _weeklyDistance.toStringAsFixed(1), // km esta semana
+          _weeklyDistance.toStringAsFixed(1),
           "km",
           "Esta semana",
           Colors.blue[700]!,
         ),
         _buildStatItem(
-          _currentStreak.toString(), // racha actual
+          _currentStreak.toString(),
           "días",
           "Racha actual",
           Colors.green[600]!,
         ),
         _buildStatItem(
-          _user?.averagePace ?? '0:00', // Del modelo
+          _user?.averagePace ?? '0:00',
           "min/km",
           "Ritmo",
           Colors.orange[700]!,
         ),
         _buildStatItem(
-          _user?.myEventIds.length.toString() ?? '0', // Del modelo
+          _user?.myEventIds.length.toString() ?? '0',
           "Eventos",
           "Eventos inscritos",
           Colors.purple[600]!,
@@ -545,52 +553,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Tarjeta individual para una estadística
+  /// Helper para construir cada tarjeta con sombra mejorada
   Widget _buildStatItem(String value, String unit, String label, Color color) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        // --- AQUÍ ESTÁ EL SOMBREADO INTENSIFICADO ---
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.08), // Opacidad suave
+            blurRadius: 12, // Difuminado amplio
+            offset: const Offset(0, 6), // Desplazamiento hacia abajo
+            spreadRadius: 0, // No se expande hacia los lados
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
+          // Usamos Flexible para asegurar que el texto se ajuste si es muy grande
+          Flexible(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
           Text(
             unit,
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: color.withOpacity(0.8),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             label,
-            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),
